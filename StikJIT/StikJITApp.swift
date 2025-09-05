@@ -22,54 +22,102 @@ private func registerAdvancedOptionsDefault() {
 // MARK: - Welcome Sheet
 
 struct WelcomeSheetView: View {
-    // A callback to dismiss the sheet and trigger VPN setup.
     var onDismiss: (() -> Void)?
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        VStack(spacing: 24) {
-            Text("Welcome!")
-                .font(.system(.largeTitle, design: .rounded).weight(.bold))
-                .foregroundColor(.primary)
-                .padding(.top)
+        ZStack {
+            // Subtle gradient background to match app style
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(UIColor.systemBackground),
+                    Color(UIColor.secondarySystemBackground)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
             
-            Text("Thanks for installing the app. This brief introduction will help you get started.")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Text("StikDebug is an on-device debugger designed specifically for self-developed apps. It helps streamline testing and troubleshooting without sending any data to external servers.")
-                .font(.callout)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Text("The next step will prompt you to allow VPN permissions. This is necessary for the app to function properly. The VPN configuration allows your device to securely connect to itself — nothing more. Rest assured, no data is collected or sent externally. Everything stays on your device.")
-                .font(.callout)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Button(action: {
-                onDismiss?()
-            }) {
-                Text("Continue")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor))
-                    .foregroundColor(.white)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Card container with glassy material and stroke
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Title
+                        Text("Welcome!")
+                            .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                            .foregroundColor(.primary)
+                            .padding(.top, 8)
+                        
+                        // Intro
+                        Text("Thanks for installing the app. This brief introduction will help you get started.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                        
+                        // App description
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("On‑device debugger", systemImage: "bolt.shield.fill")
+                                .foregroundColor(.white)
+                                .font(.headline)
+                            Text("StikDebug is an on‑device debugger designed specifically for self‑developed apps. It helps streamline testing and troubleshooting without sending any data to external servers.")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        
+                        // VPN explanation
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Why VPN permission?", systemImage: "lock.shield.fill")
+                                .foregroundColor(.white)
+                                .font(.headline)
+                            Text("The next step will prompt you to allow VPN permissions. This is necessary for the app to function properly. The VPN configuration allows your device to securely connect to itself — nothing more. No data is collected or sent externally; everything stays on your device.")
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        
+                        // Continue button
+                        Button(action: { onDismiss?() }) {
+                            Text("Continue")
+                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                .foregroundColor(.black)
+                                .frame(height: 44)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.white)
+                                )
+                        }
+                        .padding(.top, 8)
+                        .accessibilityIdentifier("welcome_continue_button")
+                    }
+                    .padding(20)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+                    
+                    // Footer version info for consistency
+                    HStack {
+                        Spacer()
+                        Text("iOS \(UIDevice.current.systemVersion)")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                    .padding(.top, 6)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 30)
             }
-            .padding(.horizontal)
-            .padding(.bottom)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(Color(UIColor.secondarySystemBackground))
-                .shadow(radius: 20)
-        )
-        .padding()
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -271,10 +319,10 @@ class TunnelManager: ObservableObject {
     }
 }
 
-// MARK: - AccentColor Environment Key
+// MARK: - AccentColor Environment Key (leave available but unused)
 
 struct AccentColorKey: EnvironmentKey {
-    static let defaultValue: Color = .blue
+    static let defaultValue: Color = .white
 }
 
 extension EnvironmentValues {
@@ -457,8 +505,7 @@ struct HeartbeatApp: App {
     @State private var showContinueWarning = false
     @State private var timeoutTimer: Timer?
     @StateObject private var mount = MountingProgress.shared
-    @StateObject private var dnsChecker = DNSChecker()  // New DNS check state object
-    @AppStorage("appTheme") private var appTheme: String = "system"
+    @StateObject private var dnsChecker = DNSChecker()
     @Environment(\.scenePhase) private var scenePhase   // Observe scene lifecycle
     
     let urls: [String] = [
@@ -482,17 +529,14 @@ struct HeartbeatApp: App {
         let origMethod = class_getInstanceMethod(UIDocumentPickerViewController.self, #selector(UIDocumentPickerViewController.init(forOpeningContentTypes:asCopy:)))!
         method_exchangeImplementations(origMethod, fixMethod)
         
+        // Force global dark mode for the entire app
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first {
-            switch appTheme {
-            case "dark":
-                window.overrideUserInterfaceStyle = .dark
-            case "light":
-                window.overrideUserInterfaceStyle = .light
-            default:
-                window.overrideUserInterfaceStyle = .unspecified
-            }
+            window.overrideUserInterfaceStyle = .dark
         }
+        
+        // Ensure UIKit controls also use white tint globally
+        UIView.appearance().tintColor = .white
     }
     
     func newVerCheck() {
@@ -510,20 +554,6 @@ struct HeartbeatApp: App {
                 }
             }
             UserDefaults.standard.set(currentDate, forKey: "VersionUpdateAlert")
-        }
-    }
-    
-    private func applyTheme() {
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            switch appTheme {
-            case "dark":
-                window.overrideUserInterfaceStyle = .dark
-            case "light":
-                window.overrideUserInterfaceStyle = .light
-            default:
-                window.overrideUserInterfaceStyle = .unspecified
-            }
         }
     }
     
@@ -646,11 +676,16 @@ struct HeartbeatApp: App {
                             isLoading2 = false
                         }) {
                             ConsoleLogsView()
+                                .preferredColorScheme(.dark)
                         }
                 } else {
                     MainTabView()
                         .onAppear {
-                            applyTheme()
+                            // Force dark mode on main window as well
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let window = windowScene.windows.first {
+                                window.overrideUserInterfaceStyle = .dark
+                            }
                             let fileManager = FileManager.default
                             for (index, urlString) in urls.enumerated() {
                                 let destinationURL = URL.documentsDirectory.appendingPathComponent(outputFiles[index])
@@ -680,8 +715,11 @@ struct HeartbeatApp: App {
                                 }
                             }
                         )
+                        .preferredColorScheme(.dark)
                 }
             }
+            // Apply global white tint to all SwiftUI views in the window
+            .tint(Color.white)
             .onAppear {
                 // On first launch, present the welcome sheet.
                 // Otherwise, start the VPN automatically.
@@ -698,25 +736,14 @@ struct HeartbeatApp: App {
                     showWelcomeSheet = false
                     TunnelManager.shared.startVPN()
                 }
+                .preferredColorScheme(.dark)
             }
+            .preferredColorScheme(.dark)
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 print("App became active – restarting heartbeat")
                 startHeartbeatInBackground()
-            }
-        }
-        .onChange(of: isLoading2) { newValue in
-            if !newValue {
-                timeoutTimer?.invalidate()
-                timeoutTimer = nil
-            }
-        }
-        .onChange(of: dnsChecker.dnsError) { newError in
-            if let errorMsg = newError, !errorMsg.contains("Not connected to WiFi") {
-                alert_title = "Network Issue"
-                alert_string = errorMsg
-                show_alert = true
             }
         }
     }
@@ -924,46 +951,24 @@ struct LoadingView: View {
     
     @State private var animate = false
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
-    @AppStorage("appTheme") private var appTheme: String = "system"
-    
-    private var accentColor: Color {
-        if customAccentColorHex.isEmpty {
-            return .blue
-        } else {
-            return Color(hex: customAccentColorHex) ?? .blue
-        }
-    }
-    
-    private var isDarkMode: Bool {
-        switch appTheme {
-        case "dark":
-            return true
-        case "light":
-            return false
-        default:
-            return colorScheme == .dark
-        }
-    }
     
     var body: some View {
         ZStack {
-            Color(isDarkMode ? .black : .white)
-                .ignoresSafeArea()
+            Color.black.ignoresSafeArea()
             
             VStack {
                 ZStack {
                     Circle()
                         .stroke(lineWidth: 8)
-                        .foregroundColor(isDarkMode ? Color.white.opacity(0.3) : Color.black.opacity(0.1))
+                        .foregroundColor(Color.white.opacity(0.15))
                         .frame(width: 80, height: 80)
                     
                     Circle()
                         .trim(from: 0, to: 0.7)
                         .stroke(AngularGradient(
                             gradient: Gradient(colors: [
-                                accentColor.opacity(0.8),
-                                accentColor.opacity(0.3)
+                                Color.white.opacity(0.9),
+                                Color.white.opacity(0.4)
                             ]),
                             center: .center
                         ), style: StrokeStyle(lineWidth: 6, lineCap: .round))
@@ -971,7 +976,7 @@ struct LoadingView: View {
                         .frame(width: 80, height: 80)
                         .animation(Animation.linear(duration: 1.2).repeatForever(autoreverses: false), value: animate)
                 }
-                .shadow(color: accentColor.opacity(0.4), radius: 10, x: 0, y: 0)
+                .shadow(color: Color.white.opacity(0.25), radius: 10, x: 0, y: 0)
                 .onAppear {
                     animate = true
                     let os = ProcessInfo.processInfo.operatingSystemVersion
@@ -984,12 +989,13 @@ struct LoadingView: View {
                 
                 Text("Loading...")
                     .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .foregroundColor(isDarkMode ? .white.opacity(0.8) : .black.opacity(0.8))
+                    .foregroundColor(.white.opacity(0.85))
                     .padding(.top, 20)
                     .opacity(animate ? 1.0 : 0.5)
                     .animation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: animate)
             }
         }
+        .preferredColorScheme(.dark)
     }
 }
 

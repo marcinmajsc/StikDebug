@@ -34,7 +34,17 @@ struct InstalledAppsListView: View {
 
     var body: some View {
         NavigationView {
-            Group {
+            ZStack {
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(UIColor.systemBackground),
+                        Color(UIColor.secondarySystemBackground)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
                 if viewModel.apps.isEmpty {
                     emptyState
                 } else {
@@ -48,85 +58,118 @@ struct InstalledAppsListView: View {
                 }
             }
         }
-        .background(Color(UIColor.systemGroupedBackground).edgesIgnoringSafeArea(.all))
     }
 
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "magnifyingglass")
-                .resizable().scaledToFit().frame(width: 60, height: 60).foregroundColor(.gray)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+                .foregroundColor(.gray)
+
             Text("No Debuggable App Found")
-                .font(.title2).fontWeight(.semibold).foregroundColor(.primary)
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+
             Text("""
 StikDebug can only connect to apps with the "**get-task-allow**" entitlement. \
 Please check if the app you want to connect to is signed with a **development** certificate.
 """)
-                .font(.body).foregroundColor(.secondary).multilineTextAlignment(.center).padding(.horizontal)
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
         }
-        .padding().frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(UIColor.systemBackground))
+        .padding(30)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .padding()
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
     }
 
     private var appsList: some View {
-        List {
-            if !favoriteApps.isEmpty {
-                Section(header: Text(String(format: "Favorites (%d/4)".localized, favoriteApps.count))) {
-                    ForEach(favoriteApps, id: \.self) { bundleID in
-                        AppButton(
-                            bundleID: bundleID,
-                            appName: viewModel.apps[bundleID] ?? bundleID,
-                            recentApps: $recentApps,
-                            favoriteApps: $favoriteApps,
-                            appIcons: $appIcons,
-                            onSelectApp: onSelectApp,
-                            sharedDefaults: sharedDefaults
-                        )
-                    }
-                }
-            }
-
-            if !filteredRecents.isEmpty {
-                Section(header: Text("Recents".localized)) {
-                    ForEach(filteredRecents, id: \.self) { bundleID in
-                        AppButton(
-                            bundleID: bundleID,
-                            appName: viewModel.apps[bundleID] ?? bundleID,
-                            recentApps: $recentApps,
-                            favoriteApps: $favoriteApps,
-                            appIcons: $appIcons,
-                            onSelectApp: onSelectApp,
-                            sharedDefaults: sharedDefaults
-                        )
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                withAnimation {
-                                    recentApps.removeAll { $0 == bundleID }
-                                    sharedDefaults.set(recentApps, forKey: "recentApps")
-                                    WidgetCenter.shared.reloadAllTimelines()
-                                }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+        ScrollView {
+            VStack(spacing: 18) {
+                if !favoriteApps.isEmpty {
+                    glassSection(title: String(format: "Favorites (%d/4)".localized, favoriteApps.count)) {
+                        ForEach(favoriteApps, id: \.self) { bundleID in
+                            AppButton(
+                                bundleID: bundleID,
+                                appName: viewModel.apps[bundleID] ?? bundleID,
+                                recentApps: $recentApps,
+                                favoriteApps: $favoriteApps,
+                                appIcons: $appIcons,
+                                onSelectApp: onSelectApp,
+                                sharedDefaults: sharedDefaults
+                            )
                         }
                     }
                 }
-            }
 
-            Section(header: Text((favoriteApps.isEmpty && filteredRecents.isEmpty) ? "" : "All Applications".localized)) {
-                ForEach(viewModel.apps.sorted(by: { $0.key < $1.key }), id: \.key) { bundleID, appName in
-                    AppButton(
-                        bundleID: bundleID,
-                        appName: appName,
-                        recentApps: $recentApps,
-                        favoriteApps: $favoriteApps,
-                        appIcons: $appIcons,
-                        onSelectApp: onSelectApp,
-                        sharedDefaults: sharedDefaults
-                    )
+                if !filteredRecents.isEmpty {
+                    glassSection(title: "Recents".localized) {
+                        ForEach(filteredRecents, id: \.self) { bundleID in
+                            AppButton(
+                                bundleID: bundleID,
+                                appName: viewModel.apps[bundleID] ?? bundleID,
+                                recentApps: $recentApps,
+                                favoriteApps: $favoriteApps,
+                                appIcons: $appIcons,
+                                onSelectApp: onSelectApp,
+                                sharedDefaults: sharedDefaults
+                            )
+                        }
+                    }
+                }
+
+                glassSection(title: (favoriteApps.isEmpty && filteredRecents.isEmpty) ? "All Applications".localized : "All Applications".localized) {
+                    ForEach(viewModel.apps.sorted(by: { $0.key < $1.key }), id: \.key) { bundleID, appName in
+                        AppButton(
+                            bundleID: bundleID,
+                            appName: appName,
+                            recentApps: $recentApps,
+                            favoriteApps: $favoriteApps,
+                            appIcons: $appIcons,
+                            onSelectApp: onSelectApp,
+                            sharedDefaults: sharedDefaults
+                        )
+                    }
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
         }
-        .listStyle(.plain)
+    }
+
+    private func glassSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.secondary)
+
+            VStack(spacing: 12) {
+                content()
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
     }
 }
 
@@ -151,7 +194,17 @@ struct AppButton: View {
                 appText
                 Spacer()
             }
-            .padding(.vertical, loadAppIconsOnJIT ? 0 : 8)
+            .padding(.vertical, loadAppIconsOnJIT ? 8 : 12)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+            )
+            .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 3)
         }
         .contextMenu {
             Button(action: toggleFavorite) {
@@ -186,16 +239,16 @@ struct AppButton: View {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 60, height: 60)
+                    .frame(width: 54, height: 54)
                     .cornerRadius(12)
-                    .shadow(color: colorScheme == .dark ? .black.opacity(0.2) : .gray.opacity(0.2), radius: 3, x: 0, y: 1)
+                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
             } else {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(UIColor.systemGray5))
-                    .frame(width: 60, height: 60)
+                    .frame(width: 54, height: 54)
                     .overlay(
                         Image(systemName: "app")
-                            .font(.system(size: 26))
+                            .font(.system(size: 24))
                             .foregroundColor(.gray)
                     )
                     .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
@@ -205,13 +258,13 @@ struct AppButton: View {
     }
 
     private var appText: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(appName)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.primary)
             Text(bundleID)
-                .font(.system(size: 15))
-                .foregroundColor(.gray)
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
                 .lineLimit(1)
         }
     }
@@ -251,15 +304,11 @@ struct AppButton: View {
     private func loadAppIcon(for bundleID: String) {
         guard loadAppIconsOnJIT else { return }
 
-        // 1) Check disk cache first
         if let cachedImage = loadCachedIcon(bundleID: bundleID) {
-            DispatchQueue.main.async {
-                appIcons[bundleID] = cachedImage
-            }
+            DispatchQueue.main.async { appIcons[bundleID] = cachedImage }
             return
         }
 
-        // 2) Otherwise fetch from network and then cache
         AppStoreIconFetcher.getIcon(for: bundleID) { image in
             guard let image = image else { return }
             DispatchQueue.main.async {
@@ -313,7 +362,6 @@ extension Array: @retroactive RawRepresentable where Element: Codable {
     }
 }
 
-// Preview helper
 #Preview {
     InstalledAppsListView { _ in }
 }

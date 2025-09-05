@@ -48,174 +48,112 @@ struct HomeView: View {
     @AppStorage("DefaultScriptName") var selectedScript = "attachDetach.js"
     @State var jsModel: RunJSViewModel?
     
+    // Observe VPN status
+    @StateObject private var tunnel = TunnelManager.shared
+    // Mirror heartbeat boolean
+    @State private var heartbeatOK = false
+    
     private var accentColor: Color {
         if customAccentColorHex.isEmpty {
-            return .blue
+            return .white
         } else {
-            return Color(hex: customAccentColorHex) ?? .blue
+            return Color(hex: customAccentColorHex) ?? .white
         }
     }
 
+    // Derived states
+    private var ddiMounted: Bool { isMounted() }
+    private var canConnectByApp: Bool { pairingFileExists && ddiMounted }
+
     var body: some View {
-        ZStack {
-            // Use system background
-            Color(colorScheme == .dark ? .black : .white)
-            .edgesIgnoringSafeArea(.all)
-            
-            VStack(spacing: 25) {
-                Spacer()
-                VStack(spacing: 5) {
-                    Text("Welcome to StikDebug \(username)!")
-                        .font(.system(.largeTitle, design: .rounded))
-                        .fontWeight(.bold)
-                    
-                    Text(pairingFileExists ? "Click connect to get started" : "Pick pairing file to get started")
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 40)
+        NavigationStack {
+            ZStack {
+                // DeviceInfo-style subtle gradient background
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(UIColor.systemBackground),
+                        Color(UIColor.secondarySystemBackground)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 
-                Button(action: {
-                    
-                    
-                    if pairingFileExists {
-                        // Got a pairing file, show apps
-                        if !isMounted() {
-                            showAlert(title: "Device Not Mounted".localized, message: "The Developer Disk Image has not been mounted yet. Check in settings for more information.".localized, showOk: true) { cool in
-                                // No Need
-                            }
-                            return
-                        }
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Top card: status + both actions
+                        topStatusAndActionsCard
                         
-                        isShowingInstalledApps = true
+                        // Tools (Console)
+                        toolsCard
                         
-                    } else {
-                        // No pairing file yet, let's get one
-                        isShowingPairingFilePicker = true
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: pairingFileExists ? "cable.connector.horizontal" : "doc.badge.plus")
-                            .font(.system(size: 20))
-                        Text(pairingFileExists ? "Connect by App" : "Select Pairing File")
-                            .font(.system(.title3, design: .rounded))
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(accentColor)
-                    .foregroundColor(accentColor.contrastText())
-                    .cornerRadius(16)
-                    .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .padding(.horizontal, 20)
-                
-                if pairingFileExists && enableAdvancedOptions {
-                    Button(action: {
-                        pidTextAlertShow = true
-                    }) {
-                        HStack {
-                            Image(systemName: "cable.connector.horizontal")
-                                .font(.system(size: 20))
-                            Text("Connect by PID")
-                                .font(.system(.title3, design: .rounded))
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(accentColor)
-                        .foregroundColor(accentColor.contrastText())
-                        .cornerRadius(16)
-                        .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
+                        // Helpful tips
+                        tipsCard
                     }
                     .padding(.horizontal, 20)
+                    .padding(.vertical, 30)
                 }
                 
-                Button(action: {
-                    showingConsoleLogsView = true
-                }) {
-                    HStack {
-                        Image(systemName: "apple.terminal")
-                            .font(.system(size: 20))
-                        Text("Open Console")
-                            .font(.system(.title3, design: .rounded))
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(accentColor)
-                    .foregroundColor(accentColor.contrastText())
-                    .cornerRadius(16)
-                    .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .padding(.horizontal, 20)
-                .sheet(isPresented: $showingConsoleLogsView) {
-                    ConsoleLogsView()
-                }
-                
-                // Status message area - keeps layout consistent
-                ZStack {
-                    // Progress bar for importing file
-                    if isImportingFile {
+                // Busy overlay during pairing import (DeviceInfo-style)
+                if isImportingFile {
+                    Color.black.opacity(0.35).ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        ProgressView("Processing pairing file...")
                         VStack(spacing: 8) {
-                            HStack {
-                                Text("Processing pairing file...")
-                                    .font(.system(.caption, design: .rounded))
-                                    .foregroundColor(.secondaryText)
-                                Spacer()
-                                Text("\(Int(importProgress * 100))%")
-                                    .font(.system(.caption, design: .rounded))
-                                    .foregroundColor(.secondaryText)
-                            }
-                            
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.black.opacity(0.2))
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color(UIColor.tertiarySystemFill))
                                         .frame(height: 8)
                                     
-                                    RoundedRectangle(cornerRadius: 4)
+                                    RoundedRectangle(cornerRadius: 6)
                                         .fill(Color.green)
                                         .frame(width: geometry.size.width * CGFloat(importProgress), height: 8)
                                         .animation(.linear(duration: 0.3), value: importProgress)
                                 }
                             }
                             .frame(height: 8)
+                            Text("\(Int(importProgress * 100))%")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
-                        .padding(.horizontal, 40)
+                        .padding(.top, 6)
                     }
-                    
-                    // Success message
-                    if showPairingFileMessage && pairingFileIsValid {
-                        Text("✓ Pairing file successfully imported")
-                            .font(.system(.callout, design: .rounded))
-                            .foregroundColor(.green)
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 12)
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(8)
-                            .transition(.opacity)
-                    }
-                    
-                    // Invisible text to reserve space - no layout jumps
-                    Text(" ").opacity(0)
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
                 }
-                .frame(height: isImportingFile ? 60 : 30)  // Adjust height based on what's showing
                 
-                Spacer()
+                // Success toast after import (DeviceInfo-style)
+                if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
+                    VStack {
+                        Spacer()
+                        Text("✓ Pairing file successfully imported")
+                            .font(.footnote.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
+                            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 3)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .padding(.bottom, 30)
+                    }
+                    .animation(.easeInOut(duration: 0.25), value: showPairingFileMessage)
+                }
             }
-            .padding()
+            .navigationTitle("Home")
         }
         .onAppear {
             checkPairingFileExists()
-            // Don't initialize specific color value when empty - empty means "use system theme"
-            // This was causing the toggle to turn off when returning to settings
-            
-            // Initialize background color
             refreshBackground()
             
-            // Add notification observer for showing pairing file picker
             NotificationCenter.default.addObserver(
                 forName: NSNotification.Name("ShowPairingFilePicker"),
                 object: nil,
@@ -227,11 +165,11 @@ struct HomeView: View {
         .onReceive(timer) { _ in
             refreshBackground()
             checkPairingFileExists()
-
+            // Update heartbeat mirror from global
+            heartbeatOK = pubHeartBeat
         }
         .fileImporter(isPresented: $isShowingPairingFilePicker, allowedContentTypes: [UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data)!, .propertyList]) {result in
             switch result {
-            
             case .success(let url):
                 let fileManager = FileManager.default
                 let accessing = url.startAccessingSecurityScopedResource()
@@ -396,24 +334,291 @@ struct HomeView: View {
         }
     }
     
-
+    // MARK: - Styled Sections
     
-    private func checkPairingFileExists() {
-        let fileExists = FileManager.default.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path)
-        
-        // If the file exists, check if it's valid
-        if fileExists {
-            // Check if the pairing file is valid
-            let isValid = isPairing()
-            pairingFileExists = isValid
+    // Top card that includes: status icons + both actions
+    private var topStatusAndActionsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Header row with icon-only indicators
+            HStack(spacing: 12) {
+                // Pairing
+                indicatorCapsule(
+                    ok: pairingFileExists,
+                    systemImage: "doc.badge.plus",
+                    a11y: "Pairing"
+                )
+                // DDI
+                indicatorCapsule(
+                    ok: ddiMounted,
+                    systemImage: "externaldrive",
+                    a11y: "Developer Disk Image"
+                )
+                // VPN
+                indicatorCapsule(
+                    ok: tunnel.tunnelStatus == .connected,
+                    systemImage: "lock.shield",
+                    a11y: "VPN"
+                )
+                // Heartbeat
+                indicatorCapsule(
+                    ok: heartbeatOK,
+                    systemImage: "waveform.path.ecg",
+                    a11y: "Heartbeat"
+                )
+                
+                Spacer()
+            }
+            
+            // Welcome text
+            VStack(spacing: 4) {
+                Text("Welcome, \(username)")
+                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(helperSubtitle())
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.bottom, 4)
+            
+            // Buttons in one vertical stack
+            VStack(spacing: 10) {
+                // Connect by App / Select Pairing File
+                Button(action: primaryActionTapped) {
+                    HStack {
+                        Image(systemName: pairingFileExists ? "cable.connector.horizontal" : "doc.badge.plus")
+                            .font(.system(size: 20))
+                        Text(pairingFileExists ? "Connect by App" : "Select Pairing File")
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .foregroundColor(.black)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                    )
+                }
+                .disabled(pairingFileExists && !ddiMounted)
+                .opacity(pairingFileExists && !ddiMounted ? 0.6 : 1.0)
+                
+                // Connect by PID (Advanced only)
+                if pairingFileExists && enableAdvancedOptions {
+                    Button(action: { pidTextAlertShow = true }) {
+                        HStack {
+                            Image(systemName: "number.circle")
+                                .font(.system(size: 20))
+                            Text("Connect by PID")
+                                .font(.system(.title3, design: .rounded))
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .foregroundColor(.black)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                        )
+                    }
+                }
+            }
+            
+            // Inline status / progress
+            if isImportingFile {
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Processing pairing file…")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(Int(importProgress * 100))%")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(UIColor.tertiarySystemFill))
+                                .frame(height: 8)
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.green)
+                                .frame(width: geometry.size.width * CGFloat(importProgress), height: 8)
+                                .animation(.linear(duration: 0.3), value: importProgress)
+                        }
+                    }
+                    .frame(height: 8)
+                }
+                .padding(.top, 4)
+            } else if showPairingFileMessage && pairingFileIsValid {
+                HStack(spacing: 10) {
+                    StatusDot(color: .green)
+                    Text("Pairing file successfully imported")
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundColor(.green)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+    }
+    
+    // Compact indicator builder: dot + SF Symbol in a capsule
+    private func indicatorCapsule(ok: Bool, systemImage: String, a11y: String) -> some View {
+        let fixedHeight: CGFloat = 32
+        return HStack(spacing: 8) {
+            StatusDot(color: ok ? .green : .orange)
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.primary)
+                .accessibilityLabel(a11y)
+        }
+        .frame(height: fixedHeight)
+        .padding(.horizontal, 10)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color(UIColor.tertiarySystemBackground))
+        )
+    }
+    
+    private var toolsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tools")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            
+            Button(action: { showingConsoleLogsView = true }) {
+                // Centered icon + text, no chevron
+                HStack(spacing: 8) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 20))
+                    Text("Open Console")
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .foregroundColor(.black)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 12)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                )
+            }
+            .sheet(isPresented: $showingConsoleLogsView) {
+                ConsoleLogsView()
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+    }
+    
+    private var tipsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tips")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            
+            if !pairingFileExists {
+                tipRow(
+                    systemImage: "doc.badge.plus",
+                    title: "Pairing file required",
+                    message: "Import your device’s pairing file to begin."
+                )
+            }
+            
+            if pairingFileExists && !ddiMounted {
+                tipRow(
+                    systemImage: "externaldrive.badge.exclamationmark",
+                    title: "Developer Disk Image not mounted",
+                    message: "Go to Settings → Developer Disk Image and ensure it’s mounted."
+                )
+            }
+            
+            tipRow(
+                systemImage: "lock.shield",
+                title: "Local only",
+                message: "StikDebug runs entirely on-device. No data leaves your device."
+            )
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+    }
+    
+    private func tipRow(systemImage: String, title: String, message: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundColor(accentColor)
+                .font(.system(size: 18))
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline).fontWeight(.semibold)
+                Text(message).font(.footnote).foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+    
+    // MARK: - Helpers (UI)
+    
+    private func helperSubtitle() -> String {
+        if canConnectByApp { return "Select an app to start debugging." }
+        if pairingFileExists { return "Mount the Developer Disk Image in Settings." }
+        return "Import your pairing file to get started."
+    }
+    
+    private func primaryActionTapped() {
+        if pairingFileExists {
+            if !ddiMounted {
+                showAlert(title: "Device Not Mounted".localized, message: "The Developer Disk Image has not been mounted yet. Check in settings for more information.".localized, showOk: true) { _ in }
+                return
+            }
+            isShowingInstalledApps = true
         } else {
-            pairingFileExists = false
+            isShowingPairingFilePicker = true
         }
     }
     
+    // MARK: - Logic
+    
+    private func checkPairingFileExists() {
+        let fileExists = FileManager.default.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path)
+        pairingFileExists = fileExists && isPairing()
+    }
+    
     private func refreshBackground() {
-        // This function is no longer needed for background color
-        // but we'll keep it empty to avoid breaking anything
+        // kept for compatibility
     }
     
     private func getJsCallback(_ script: Data, name: String? = nil) -> DebugAppCallback {
@@ -436,7 +641,6 @@ struct HomeView: View {
     // if advanced mode is disabled the whole script loading will be skipped. If use default script is disabled default script will not be loaded
     private func startJITInBackground(bundleID: String? = nil, pid : Int? = nil, scriptData: Data? = nil, scriptName : String? = nil, triggeredByURLScheme: Bool = false) {
         isProcessing = true
-        // Add log message
         LogManager.shared.addInfoLog("Starting Debug for \(bundleID ?? String(pid ?? 0))")
         
         DispatchQueue.global(qos: .background).async {
@@ -468,7 +672,6 @@ struct HomeView: View {
                 scriptData = nil
             }
             
-            
             var callback: DebugAppCallback? = nil
             
             if let scriptData {
@@ -481,9 +684,7 @@ struct HomeView: View {
             }
             
             let logger: LogFunc = { message in
-                
                 if let message = message {
-                    // Log messages from the JIT process
                     LogManager.shared.addInfoLog(message)
                 }
             }
@@ -523,6 +724,50 @@ struct HomeView: View {
         return base64
     }
 
+}
+
+// MARK: - Status Light Components
+
+private struct StatusLight: View {
+    enum State { case ok, warn }
+    var title: String
+    var state: State
+    
+    var body: some View {
+        let fixedHeight: CGFloat = 32
+        HStack(spacing: 8) {
+            StatusDot(color: state == .ok ? .green : .orange)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.primary)
+        }
+        .frame(height: fixedHeight)
+        .padding(.horizontal, 10)
+        .background(
+            Capsule(style: .continuous)
+                .fill(Color(UIColor.tertiarySystemBackground))
+        )
+    }
+}
+
+private struct StatusDot: View {
+    var color: Color
+    @Environment(\.colorScheme) private var colorScheme
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.25))
+                .frame(width: 20, height: 20)
+            Circle()
+                .fill(color)
+                .frame(width: 12, height: 12)
+                .shadow(color: color.opacity(0.6), radius: 4, x: 0, y: 0)
+        }
+        .overlay(
+            Circle()
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.1), lineWidth: 0.5)
+        )
+    }
 }
 
 class InstalledAppsViewModel: ObservableObject {

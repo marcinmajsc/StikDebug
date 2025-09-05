@@ -32,9 +32,9 @@ struct CustomErrorView: View {
     
     private var accentColor: Color {
         if customAccentColorHex.isEmpty {
-            return .blue
+            return .white
         } else {
-            return Color(hex: customAccentColorHex) ?? .blue
+            return Color(hex: customAccentColorHex) ?? .white
         }
     }
     
@@ -164,12 +164,11 @@ struct CustomErrorView: View {
     }
     
     private func dismissWithAnimation() {
-        withAnimation(.easeOut(duration: 0.15)) {
+        withAnimation(.easeOut(duration: 0.18)) {
             opacity = 0
-            scale = 0.8
+            scale = 0.95
         }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             onDismiss()
         }
     }

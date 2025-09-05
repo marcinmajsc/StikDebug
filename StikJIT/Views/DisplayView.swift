@@ -4,7 +4,10 @@
 //  Created by neoarz on 4/9/25.
 
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
+// MARK: - Accent Color Picker (Glassy style)
 struct AccentColorPicker: View {
     @Binding var selectedColor: Color
     
@@ -15,12 +18,12 @@ struct AccentColorPicker: View {
         .red,   // Red
         .init(hex: "#6A5ACD")!, // Purple
         .init(hex: "#DA70D6")!, // Pink
-        .white, // white
-        .black // black
+        .white, // White
+        .black  // Black
     ]
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Accent Color")
                 .font(.headline)
                 .foregroundColor(.primary)
@@ -31,12 +34,10 @@ struct AccentColorPicker: View {
                         .fill(color)
                         .frame(width: 28, height: 28)
                         .overlay(
-                            Circle()
-                                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                            Circle().stroke(Color.white.opacity(0.1), lineWidth: 1)
                         )
                         .overlay(
-                            Circle()
-                                .stroke(selectedColor == color ? Color.primary : Color.clear, lineWidth: 2)
+                            Circle().stroke(selectedColor == color ? Color.primary : .clear, lineWidth: 2)
                         )
                         .onTapGesture {
                             selectedColor = color
@@ -48,17 +49,27 @@ struct AccentColorPicker: View {
                     .labelsHidden()
                     .frame(width: 28, height: 28)
                     .overlay(
-                        Circle()
-                            .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+                        Circle().stroke(Color.white.opacity(0.1), lineWidth: 1)
                     )
                     .clipShape(Circle())
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(.top, 12)
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
     }
 }
 
+// MARK: - Display Settings View
 struct DisplayView: View {
     @AppStorage("username") private var username = "User"
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
@@ -66,6 +77,8 @@ struct DisplayView: View {
     @AppStorage("loadAppIconsOnJIT") private var loadAppIconsOnJIT = true
     @State private var selectedAccentColor: Color = .blue
     @Environment(\.colorScheme) private var colorScheme
+    
+    @State private var justSaved = false
     
     private var accentColor: Color {
         if customAccentColorHex.isEmpty {
@@ -76,132 +89,163 @@ struct DisplayView: View {
     }
     
     var body: some View {
-        ZStack {
-            Color(colorScheme == .dark ? .black : UIColor.systemBackground)
+        NavigationStack {
+            ZStack {
+                // Background gradient (glassy style)
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(UIColor.systemBackground),
+                        Color(UIColor.secondarySystemBackground)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 .ignoresSafeArea()
                 
-            ScrollView {
-                VStack(spacing: 16) {
-                    // App Theme Section with Accent Colors
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Theme")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                            .padding(.bottom, 4)
-                        
-                        // Theme selector with preview images
-                        HStack(spacing: 12) {
-                            // Automatic Theme
-                            ThemeOptionButton(
-                                title: "Automatic",
-                                imageName: "System",
-                                isSelected: appTheme == "system",
-                                accentColor: selectedAccentColor,
-                                action: { appTheme = "system" }
-                            )
-                            
-                            // Light Theme
-                            ThemeOptionButton(
-                                title: "Light",
-                                imageName: "LightUI",
-                                isSelected: appTheme == "light",
-                                accentColor: selectedAccentColor,
-                                action: { appTheme = "light" }
-                            )
-                            
-                            // Dark Theme
-                            ThemeOptionButton(
-                                title: "Dark",
-                                imageName: "DarkUI",
-                                isSelected: appTheme == "dark",
-                                accentColor: selectedAccentColor,
-                                action: { appTheme = "dark" }
-                            )
-                        }
-                        .onChange(of: appTheme) { newValue in
-                            applyTheme(newValue)
-                        }
-                        
-                        Divider()
-                            .padding(.vertical, 4)
-                        
-                        // Accent Color Picker
-                        AccentColorPicker(selectedColor: Binding(
-                            get: { selectedAccentColor },
-                            set: { newColor in
-                                selectedAccentColor = newColor
-                                saveCustomAccentColor(newColor)
-                            }
-                        ))
+                ScrollView {
+                    VStack(spacing: 20) {
+                        usernameCard
+                        jitOptionsCard
                     }
-                    .padding(.vertical, 16)
-                    .padding(.horizontal, 16)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(16)
-                    
-                    // Username Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Username")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        
-                        HStack {
-                            TextField("Username", text: $username)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .padding(.vertical, 8)
-                            
-                            if !username.isEmpty {
-                                Button(action: { username = "" }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(Color(UIColor.tertiaryLabel))
-                                        .font(.system(size: 16))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .background(Color(UIColor.tertiarySystemFill))
-                        .cornerRadius(8)
-                    }
-                    .padding(.vertical, 16)
-                    .padding(.horizontal, 16)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(16)
-                    
-                    // JIT Options Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("App List")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        
-                        VStack(alignment: .leading, spacing: 6) {
-                            Toggle("Load App Icons", isOn: $loadAppIconsOnJIT)
-                                .foregroundColor(.primary)
-                                .tint(.green)
-                            
-                            Text("Disabling this will hide app icons in the app list and may improve performance, while also giving it a more minimalistic look.")
-                                .font(.footnote)
-                                .foregroundColor(Color(UIColor.secondaryLabel))
-                        }
-                    }
-                    .padding(.vertical, 16)
-                    .padding(.horizontal, 16)
-                    .background(Color(UIColor.systemGray6))
-                    .cornerRadius(16)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 30)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 20)
+                
+                if justSaved {
+                    VStack {
+                        Spacer()
+                        Text("Saved")
+                            .font(.footnote.weight(.semibold))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
+                            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 3)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .padding(.bottom, 30)
+                    }
+                    .animation(.easeInOut(duration: 0.25), value: justSaved)
+                }
+            }
+            .navigationTitle("Display")
+            .onAppear {
+                loadCustomAccentColor()
+                applyTheme(appTheme)
             }
         }
-        .navigationTitle("Display")
-        .onAppear {
-            loadCustomAccentColor()
-            applyTheme(appTheme)
-        }
     }
+    
+    // MARK: - Cards
+    
+    private var usernameCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Username")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            HStack {
+                TextField("Username", text: $username)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .padding(.vertical, 8)
+                
+                if !username.isEmpty {
+                    Button(action: {
+                        username = ""
+                        showSavedToast()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
+                            .font(.system(size: 16))
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+    }
+    
+    private var jitOptionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("App List")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle("Load App Icons", isOn: $loadAppIconsOnJIT)
+                    .tint(accentColor)
+                
+                Text("Disabling this will hide app icons in the app list and may improve performance, while also giving it a more minimalistic look.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+    }
+    
+    private var themeCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Theme")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            HStack(spacing: 12) {
+                ThemeOptionButton(title: "System", imageName: "theme-system", isSelected: appTheme == "system", accentColor: accentColor) {
+                    appTheme = "system"
+                    applyTheme(appTheme)
+                    showSavedToast()
+                }
+                ThemeOptionButton(title: "Light", imageName: "theme-light", isSelected: appTheme == "light", accentColor: accentColor) {
+                    appTheme = "light"
+                    applyTheme(appTheme)
+                    showSavedToast()
+                }
+                ThemeOptionButton(title: "Dark", imageName: "theme-dark", isSelected: appTheme == "dark", accentColor: accentColor) {
+                    appTheme = "dark"
+                    applyTheme(appTheme)
+                    showSavedToast()
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+    }
+    
+    // MARK: - Helpers
     
     private func loadCustomAccentColor() {
         if customAccentColorHex.isEmpty {
@@ -211,27 +255,26 @@ struct DisplayView: View {
         }
     }
     
-    private func saveCustomAccentColor(_ color: Color) {
-        // Always save the custom color if we got here (since auto theme mode is disabled)
-        customAccentColorHex = color.toHex() ?? ""
-    }
-    
     private func applyTheme(_ theme: String) {
-        // Set the app's theme (will apply when app is restarted)
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first {
             switch theme {
-            case "dark":
-                window.overrideUserInterfaceStyle = .dark
-            case "light":
-                window.overrideUserInterfaceStyle = .light
-            default:
-                window.overrideUserInterfaceStyle = .unspecified
+            case "dark": window.overrideUserInterfaceStyle = .dark
+            case "light": window.overrideUserInterfaceStyle = .light
+            default: window.overrideUserInterfaceStyle = .unspecified
             }
+        }
+    }
+    
+    private func showSavedToast() {
+        withAnimation { justSaved = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation { justSaved = false }
         }
     }
 }
 
+// MARK: - Theme Option Button (Glassy style)
 struct ThemeOptionButton: View {
     let title: String
     let imageName: String
@@ -245,19 +288,21 @@ struct ThemeOptionButton: View {
                 Image(imageName)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(height: 160)
-                    .cornerRadius(8)
+                    .frame(height: 120)
+                    .cornerRadius(12)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(isSelected ? accentColor : Color.clear, lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? accentColor : .clear, lineWidth: 2)
                     )
                 
                 Text(title)
                     .font(.caption)
                     .foregroundColor(isSelected ? accentColor : .primary)
             }
+            .padding(8)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 2)
         }
         .frame(maxWidth: .infinity)
     }
 }
-
