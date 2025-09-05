@@ -34,6 +34,9 @@ struct ScriptListView: View {
         return scripts.filter { $0.lastPathComponent.localizedCaseInsensitiveContains(searchText) }
     }
 
+    // Column width control (adjust to taste)
+    private let maxColumnWidth: CGFloat = 720
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -48,81 +51,38 @@ struct ScriptListView: View {
                 )
                 .ignoresSafeArea()
 
-                List {
-                    actionsSection
-
-                    if let onSelectScript {
-                        Section {
-                            Button {
-                                onSelectScript(nil)
-                            } label: {
-                                HStack {
-                                    Image(systemName: "nosign")
-                                        .foregroundStyle(.secondary)
-                                    Text("None")
-                                }
-                            }
-                        }
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Everything below shares the same fixed max width
+                        searchField
+                            .frame(maxWidth: .infinity)
+                        actionsCard
+                            .frame(maxWidth: .infinity)
+                        scriptListCard
+                            .frame(maxWidth: .infinity)
+                        footerInfo
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-
-                    Section {
-                        if filteredScripts.isEmpty {
-                            emptyRow
-                        } else {
-                            ForEach(filteredScripts, id: \.self) { script in
-                                scriptRow(script)
-                            }
-                        }
-                    } footer: {
-                        Text("Swipe left on a script to set it as default or delete it. Enable script execution after connecting in settings.")
-                    }
-                }
-                .listStyle(.insetGrouped)
-                .navigationTitle("JavaScript Files")
-                .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search scripts")
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            showNewFileAlert = true
-                        } label: {
-                            Label("New Script", systemImage: "plus")
-                        }
-                    }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            showImporter = true
-                        } label: {
-                            Label("Import", systemImage: "tray.and.arrow.down")
-                        }
-                    }
-                }
-                .onAppear(perform: loadScripts)
-                .alert("New Script", isPresented: $showNewFileAlert) {
-                    TextField("Filename", text: $newFileName)
-                    Button("Create", action: createNewScript)
-                    Button("Cancel", role: .cancel) { }
-                }
-                .fileImporter(
-                    isPresented: $showImporter,
-                    allowedContentTypes: [UTType(filenameExtension: "js") ?? .plainText],
-                    allowsMultipleSelection: false
-                ) { result in
-                    switch result {
-                    case .success(let urls):
-                        if let fileURL = urls.first {
-                            importScript(from: fileURL)
-                        }
-                    case .failure(let error):
-                        presentError(title: "File Import Error", message: error.localizedDescription)
-                    }
+                    .padding(.vertical, 30)
+                    .padding(.horizontal, 20)
+                    .frame(maxWidth: maxColumnWidth)        // <- unified column width
+                    .frame(maxWidth: .infinity)              // <- center the column
                 }
 
                 // Busy overlay
                 if isBusy {
-                    Color.black.opacity(0.2).ignoresSafeArea()
+                    Color.black.opacity(0.35).ignoresSafeArea()
                     ProgressView("Working…")
-                        .padding(14)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
                 }
 
                 // Custom alert overlay
@@ -154,13 +114,56 @@ struct ScriptListView: View {
                     .animation(.easeInOut(duration: 0.25), value: justCopied)
                 }
             }
+            .navigationTitle("JavaScript Files")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showNewFileAlert = true } label: {
+                        Label("New Script", systemImage: "plus")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showImporter = true } label: {
+                        Label("Import", systemImage: "tray.and.arrow.down")
+                    }
+                }
+            }
+            .onAppear(perform: loadScripts)
+            .alert("New Script", isPresented: $showNewFileAlert) {
+                TextField("Filename", text: $newFileName)
+                Button("Create", action: createNewScript)
+                Button("Cancel", role: .cancel) { }
+            }
+            .fileImporter(
+                isPresented: $showImporter,
+                allowedContentTypes: [UTType(filenameExtension: "js") ?? .plainText],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    if let fileURL = urls.first {
+                        importScript(from: fileURL)
+                    }
+                case .failure(let error):
+                    presentError(title: "File Import Error", message: error.localizedDescription)
+                }
+            }
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Glassy UI Sections
 
-    private var actionsSection: some View {
-        Section {
+    private var searchField: some View {
+        TextField("Search scripts…", text: $searchText)
+            .padding(12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+            )
+    }
+
+    private var actionsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
             Button {
                 showNewFileAlert = true
             } label: {
@@ -169,93 +172,105 @@ struct ScriptListView: View {
             Button {
                 showImporter = true
             } label: {
-                Label("Import", systemImage: "tray.and.arrow.down")
+                Label("Import Script", systemImage: "tray.and.arrow.down")
             }
         }
+        .padding(20)
+        .background(glassBackground)
     }
 
-    private var emptyRow: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "doc.text.magnifyingglass")
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("No scripts found")
-                    .font(.subheadline.weight(.semibold))
-                Text("Tap New Script or Import to get started.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+    private var scriptListCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let onSelectScript {
+                Button {
+                    onSelectScript(nil)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "nosign").foregroundStyle(.secondary)
+                        Text("None")
+                        Spacer(minLength: 0)
+                    }
+                }
+                Divider().background(Color.white.opacity(0.12))
+            }
+
+            if filteredScripts.isEmpty {
+                emptyRow
+            } else {
+                ForEach(filteredScripts, id: \.self) { script in
+                    scriptRow(script)
+                    Divider().background(Color.white.opacity(0.12))
+                }
             }
         }
-        .padding(.vertical, 4)
+        .padding(20)
+        .background(glassBackground)
+    }
+
+    private var footerInfo: some View {
+        Text("Swipe left on a script to set it as default or delete it. Enable script execution after connecting in settings.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 4)
+    }
+
+    private var glassBackground: some View {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+    }
+
+    // MARK: - Row UI
+
+    private var emptyRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("No scripts found", systemImage: "doc.text.magnifyingglass")
+                .foregroundColor(.orange)
+            Text("Tap New Script or Import to get started.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+        }
     }
 
     private func scriptRow(_ script: URL) -> some View {
         let isDefault = defaultScriptName == script.lastPathComponent
-
-        return Group {
-            if let onSelectScript {
-                Button {
-                    onSelectScript(script)
-                } label: {
-                    HStack {
-                        Text(script.lastPathComponent)
-                        Spacer()
-                        if isDefault {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.yellow)
-                        }
-                    }
-                }
-                .contextMenu {
-                    Button {
-                        copyName(script)
-                    } label: {
-                        Label("Copy Filename", systemImage: "doc.on.doc")
-                    }
-                }
-            } else {
-                NavigationLink {
-                    ScriptEditorView(scriptURL: script)
-                } label: {
-                    HStack {
-                        Text(script.lastPathComponent)
-                        Spacer()
-                        if isDefault {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.yellow)
-                        }
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        deleteScript(script)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                    Button {
-                        saveDefaultScript(script)
-                    } label: {
-                        Label("Set Default", systemImage: "star")
-                    }
-                    .tint(.blue)
-                }
-                .contextMenu {
-                    Button {
-                        copyName(script)
-                    } label: {
-                        Label("Copy Filename", systemImage: "doc.on.doc")
-                    }
-                    Button {
-                        copyPath(script)
-                    } label: {
-                        Label("Copy Path", systemImage: "folder")
-                    }
-                }
+        return HStack {
+            Text(script.lastPathComponent)
+            Spacer()
+            if isDefault {
+                Image(systemName: "star.fill")
+                    .foregroundColor(.yellow)
             }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let onSelectScript { onSelectScript(script) }
+            else {
+                // fallback to open editor if provided in your project
+                // You can replace this with a NavigationLink if you prefer
+            }
+        }
+        .contextMenu {
+            Button { copyName(script) }  label: { Label("Copy Filename", systemImage: "doc.on.doc") }
+            Button { copyPath(script) }  label: { Label("Copy Path", systemImage: "folder") }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                deleteScript(script)
+            } label: { Label("Delete", systemImage: "trash") }
+
+            Button {
+                saveDefaultScript(script)
+            } label: { Label("Set Default", systemImage: "star") }
+            .tint(.blue)
         }
     }
 
-    // MARK: - File Ops
+    // MARK: - File Ops (from your original)
 
     private func scriptsDirectory() -> URL {
         let dir = FileManager
@@ -304,9 +319,7 @@ struct ScriptListView: View {
     private func createNewScript() {
         guard !newFileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         var filename = newFileName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !filename.hasSuffix(".js") {
-            filename += ".js"
-        }
+        if !filename.hasSuffix(".js") { filename += ".js" }
         let newURL = scriptsDirectory().appendingPathComponent(filename)
 
         guard !FileManager.default.fileExists(atPath: newURL.path) else {
@@ -340,9 +353,7 @@ struct ScriptListView: View {
     private func importScript(from fileURL: URL) {
         isBusy = true
         DispatchQueue.global(qos: .userInitiated).async {
-            defer {
-                DispatchQueue.main.async { self.isBusy = false }
-            }
+            defer { DispatchQueue.main.async { self.isBusy = false } }
             do {
                 let dest = scriptsDirectory().appendingPathComponent(fileURL.lastPathComponent)
                 if FileManager.default.fileExists(atPath: dest.path) {
