@@ -9,7 +9,7 @@ import SwiftUI
 import Foundation
 import UniformTypeIdentifiers
 import ZIPFoundation
-import ZSign
+import Zsign
 import StikImporter
 import UIKit
 import PhotosUI
