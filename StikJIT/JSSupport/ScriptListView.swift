@@ -127,9 +127,7 @@ struct ScriptListView: View {
                 Button("Cancel", role: .cancel) { }
             }
             .alert("Delete Script?", isPresented: $showDeleteConfirmation, presenting: pendingDelete) { script in
-                Button("Delete", role: .destructive) {
-                    deleteScript(script)
-                }
+                Button("Delete", role: .destructive) { deleteScript(script) }
                 Button("Cancel", role: .cancel) { pendingDelete = nil }
             } message: { script in
                 Text("Are you sure you want to delete \(script.lastPathComponent)? This cannot be undone.")
@@ -158,23 +156,13 @@ struct ScriptListView: View {
                         .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
                 )
 
-            HStack {
-                Button {
+            // Equal-width rounded-rectangle buttons with centered content
+            HStack(spacing: 12) {
+                WideGlassyButton(title: "New", systemImage: "doc.badge.plus") {
                     showNewFileAlert = true
-                } label: {
-                    Label("New", systemImage: "doc.badge.plus")
-                        .font(.callout.weight(.semibold))
-                        .padding(10)
-                        .background(.ultraThinMaterial, in: Capsule())
                 }
-
-                Button {
+                WideGlassyButton(title: "Import", systemImage: "tray.and.arrow.down") {
                     showImporter = true
-                } label: {
-                    Label("Import", systemImage: "tray.and.arrow.down")
-                        .font(.callout.weight(.semibold))
-                        .padding(10)
-                        .background(.ultraThinMaterial, in: Capsule())
                 }
             }
         }
@@ -259,9 +247,8 @@ struct ScriptListView: View {
         do {
             if exists && !isDir.boolValue {
                 try FileManager.default.removeItem(at: dir)
-                exists = false
             }
-            if !exists {
+            if !exists || !isDir.boolValue {
                 try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                 if let bundleURL = Bundle.main.url(forResource: "attachDetach", withExtension: "js") {
                     let dest = dir.appendingPathComponent("attachDetach.js")
@@ -368,5 +355,40 @@ struct ScriptListView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             withAnimation { justCopied = false }
         }
+    }
+}
+
+// MARK: - Equal-width rounded-rectangle button (centered content)
+private struct WideGlassyButton: View {
+    let title: String
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .imageScale(.medium)
+                    .font(.body.weight(.semibold))
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .center) // center contents horizontally
+            .padding(.horizontal, 14)
+        }
+        .frame(height: 44)
+        .frame(maxWidth: .infinity) // make both buttons equal width
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .buttonStyle(.plain)
     }
 }
