@@ -49,6 +49,7 @@ struct ScriptEditorView: View {
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
+                .foregroundColor(.black)
             }
             .padding()
         }
