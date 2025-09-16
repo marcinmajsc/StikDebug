@@ -15,7 +15,10 @@ struct SettingsView: View {
     @AppStorage("enableAdvancedBetaOptions") private var enableAdvancedBetaOptions = false
     @AppStorage("enableTesting") private var enableTesting = false
     @AppStorage("enablePiP") private var enablePiP = false
-
+    @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
+    
     @State private var isShowingPairingFilePicker = false
     @Environment(\.colorScheme) private var colorScheme
 
@@ -27,10 +30,6 @@ struct SettingsView: View {
     @State private var is_lc = false
     @State private var showColorPickerPopup = false
     
-    @StateObject private var mountProg = MountingProgress.shared
-    
-    @State private var mounted = false
-    
     @State private var showingConsoleLogsView = false
     @State private var showingDisplayView = false
     
@@ -38,7 +37,11 @@ struct SettingsView: View {
         let marketingVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         return marketingVersion
     }
-
+    
+    private var accentColor: Color {
+        if customAccentColorHex.isEmpty { return .white }
+        return Color(hex: customAccentColorHex) ?? .white
+    }
     // Developer profile image URLs
     private let developerProfiles: [String: String] = [
         "Stephen": "https://github.com/StephenDev0.png",
@@ -54,22 +57,14 @@ struct SettingsView: View {
         NavigationStack {
             ZStack {
                 // Subtle depth gradient background
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(UIColor.systemBackground),
-                        Color(UIColor.secondarySystemBackground)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                ThemedBackground(style: currentTheme.backgroundStyle)
+                    .ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 20) {
                         headerCard
                         appearanceCard
                         pairingCard
-                        ddiCard
                         behaviorCard
                         advancedCard
                         helpCard
@@ -209,7 +204,7 @@ struct SettingsView: View {
     // MARK: - Cards
     
     private var headerCard: some View {
-        materialCard {
+        glassCard {
             VStack(spacing: 16) {
                 VStack {
                     Image("StikJIT")
@@ -232,7 +227,7 @@ struct SettingsView: View {
     }
     
     private var appearanceCard: some View {
-        materialCard {
+        glassCard {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Appearance")
                     .font(.headline)
@@ -262,7 +257,7 @@ struct SettingsView: View {
     }
     
     private var pairingCard: some View {
-        materialCard {
+        glassCard {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Pairing File")
                     .font(.headline)
@@ -279,8 +274,12 @@ struct SettingsView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .foregroundColor(.black)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .foregroundColor(accentColor.contrastText())
+                    .background(accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                    )
                 }
                 
                 if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
@@ -298,78 +297,17 @@ struct SettingsView: View {
         }
     }
     
-    private var ddiCard: some View {
-        materialCard {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Developer Disk Image")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                HStack(spacing: 12) {
-                    Image(systemName: mounted || (mountProg.mountProgress == 100) ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(mounted || (mountProg.mountProgress == 100) ? .green : .red)
-                    
-                    Text(mounted || (mountProg.mountProgress == 100) ? "Successfully Mounted" : "Not Mounted")
-                        .font(.body.weight(.medium))
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color(UIColor.tertiarySystemBackground))
-                )
-                
-                if !(mounted || (mountProg.mountProgress == 100)) {
-                    Text("Import pairing file and restart the app to mount DDI")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                if mountProg.mountProgress > 0 && mountProg.mountProgress < 100 && !mounted {
-                    VStack(spacing: 8) {
-                        HStack {
-                            Text("Mounting in progress…")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("\(Int(mountProg.mountProgress))%")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(UIColor.tertiarySystemFill))
-                                    .frame(height: 8)
-                                
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.green)
-                                    .frame(width: geometry.size.width * CGFloat(mountProg.mountProgress / 100.0), height: 8)
-                                    .animation(.linear(duration: 0.3), value: mountProg.mountProgress)
-                            }
-                        }
-                        .frame(height: 8)
-                    }
-                }
-            }
-            .onAppear {
-                self.mounted = isMounted()
-            }
-        }
-    }
-    
     private var behaviorCard: some View {
-        materialCard {
+        glassCard {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Behavior")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
                 Toggle("Run Default Script After Connecting", isOn: $useDefaultScript)
-                    .foregroundColor(.primary)
+                    .tint(accentColor)
                 Toggle("Picture in Picture", isOn: $enablePiP)
-                    .foregroundColor(.primary)
+                    .tint(accentColor)
             }
             .onChange(of: enableAdvancedOptions) { _, newValue in
                 if !newValue {
@@ -386,46 +324,9 @@ struct SettingsView: View {
             }
         }
     }
-    
-    private var aboutCard: some View {
-        materialCard {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("About")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Creators")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    HStack(spacing: 12) {
-                        creatorTile(name: "Stephen", role: "App Creator", url: "https://github.com/StephenDev0", imageUrl: developerProfiles["Stephen"] ?? "")
-                        creatorTile(name: "jkcoxson", role: "idevice & em_proxy", url: "https://jkcoxson.com/", imageUrl: developerProfiles["jkcoxson"] ?? "")
-                    }
-                }
-                
-                Divider().background(Color.white.opacity(0.12))
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Developers")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    VStack(spacing: 10) {
-                        CollaboratorRow(name: "Stossy11", url: "https://github.com/Stossy11", imageUrl: developerProfiles["Stossy11"] ?? "")
-                        CollaboratorRow(name: "Neo", url: "https://neoarz.xyz/", imageUrl: developerProfiles["Neo"] ?? "")
-                        CollaboratorRow(name: "Se2crid", url: "https://github.com/Se2crid", imageUrl: developerProfiles["Se2crid"] ?? "")
-                        CollaboratorRow(name: "Huge_Black", url: "https://github.com/HugeBlack", imageUrl: developerProfiles["Huge_Black"] ?? "")
-                        CollaboratorRow(name: "Wynwxst", url: "https://github.com/Wynwxst", imageUrl: developerProfiles["Wynwxst"] ?? "")
-                    }
-                }
-            }
-        }
-    }
-    
+        
     private var advancedCard: some View {
-        materialCard {
+        glassCard {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Advanced")
                     .font(.headline)
@@ -469,7 +370,7 @@ struct SettingsView: View {
     }
     
     private var helpCard: some View {
-        materialCard {
+        glassCard {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Help")
                     .font(.headline)
@@ -520,9 +421,10 @@ struct SettingsView: View {
     }
     
     private var versionInfo: some View {
-        HStack {
+        let txmLabel = ProcessInfo.processInfo.hasTXM ? "TXM" : "Non TXM"
+        return HStack {
             Spacer()
-            Text("Version \(appVersion) • iOS \(UIDevice.current.systemVersion)")
+            Text("Version \(appVersion) • iOS \(UIDevice.current.systemVersion) • \(txmLabel)")
                 .font(.footnote)
                 .foregroundColor(.secondary)
             Spacer()
@@ -532,7 +434,7 @@ struct SettingsView: View {
     
     // MARK: - Helpers (UI + logic)
     
-    private func materialCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func glassCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(20)
             .background(
@@ -546,29 +448,7 @@ struct SettingsView: View {
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
     }
-    
-    private func creatorTile(name: String, role: String, url: String, imageUrl: String) -> some View {
-        Button(action: {
-            if let u = URL(string: url) { UIApplication.shared.open(u) }
-        }) {
-            VStack(spacing: 8) {
-                ProfileImage(url: imageUrl)
-                    .frame(width: 60, height: 60)
-                Text(name).fontWeight(.semibold)
-                Text(role)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .frame(minWidth: 0, maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color(UIColor.tertiarySystemBackground))
-            )
-        }
-    }
-    
+        
     private func changeAppIcon(to iconName: String) {
         selectedAppIcon = iconName
         UIApplication.shared.setAlternateIconName(iconName == "AppIcon" ? nil : iconName) { error in
@@ -673,115 +553,6 @@ struct LinkRow: View {
     }
 }
 
-struct CollaboratorGridItem: View {
-    var name: String
-    var url: String
-    var imageUrl: String
-    
-    var body: some View {
-        Button(action: {
-            if let url = URL(string: url) {
-                UIApplication.shared.open(url)
-            }
-        }) {
-            VStack(spacing: 8) {
-                ProfileImage(url: imageUrl)
-                    .frame(width: 50, height: 50)
-                Text(name)
-                    .foregroundColor(.primary)
-                    .fontWeight(.medium)
-                    .font(.subheadline)
-            }
-            .frame(minWidth: 80)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(Color(UIColor.tertiarySystemBackground))
-            .cornerRadius(12)
-        }
-        .preferredColorScheme(.dark)
-    }
-}
-
-struct ProfileImage: View {
-    var url: String
-    @State private var image: UIImage?
-    
-    var body: some View {
-        Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                    )
-            } else {
-                Circle()
-                    .fill(Color(UIColor.systemGray4))
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                    )
-                    .onAppear {
-                        loadImage()
-                    }
-            }
-        }
-    }
-    
-    private func loadImage() {
-        guard let imageUrl = URL(string: url) else { return }
-        URLSession.shared.dataTask(with: imageUrl) { data, response, error in
-            if let data = data, let downloadedImage = UIImage(data: data) {
-                DispatchQueue.main.async {
-                    self.image = downloadedImage
-                }
-            }
-        }.resume()
-    }
-}
-
-struct CollaboratorRow: View {
-    var name: String
-    var url: String
-    var imageUrl: String
-    var quote: String?
-    
-    var body: some View {
-        Button(action: {
-            if let url = URL(string: url) {
-                UIApplication.shared.open(url)
-            }
-        }) {
-            HStack(spacing: 12) {
-                ProfileImage(url: imageUrl)
-                    .frame(width: 40, height: 40)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .foregroundColor(.primary)
-                        .fontWeight(.medium)
-                    if let quote = quote {
-                        Text("“\(quote)”")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                }
-                Spacer()
-                Image(systemName: "link")
-                    .font(.system(size: 16))
-                    .foregroundColor(.white)
-            }
-            .padding(.vertical, 8)
-        }
-        .preferredColorScheme(.dark)
-    }
-}
-
 struct ConsoleLogsView_Preview: PreviewProvider {
     static var previews: some View {
         ConsoleLogsView()
@@ -805,4 +576,3 @@ class FolderViewController: UIViewController {
         }
     }
 }
-

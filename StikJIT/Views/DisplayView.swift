@@ -12,14 +12,14 @@ struct AccentColorPicker: View {
     @Binding var selectedColor: Color
     
     let colors: [Color] = [
-        .blue,  // Default system blue
-        .init(hex: "#7FFFD4")!, // Aqua
-        .init(hex: "#50C878")!, // Green
-        .red,   // Red
-        .init(hex: "#6A5ACD")!, // Purple
-        .init(hex: "#DA70D6")!, // Pink
-        .white, // White
-        .black  // Black
+        .blue,
+        .init(hex: "#7FFFD4")!,
+        .init(hex: "#50C878")!,
+        .red,
+        .init(hex: "#6A5ACD")!,
+        .init(hex: "#DA70D6")!,
+        .white,
+        .black
     ]
     
     var body: some View {
@@ -44,7 +44,6 @@ struct AccentColorPicker: View {
                         }
                 }
                 
-                // Direct Color Picker Circle
                 ColorPicker("", selection: $selectedColor)
                     .labelsHidden()
                     .frame(width: 28, height: 28)
@@ -73,38 +72,46 @@ struct AccentColorPicker: View {
 struct DisplayView: View {
     @AppStorage("username") private var username = "User"
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
-    @AppStorage("appTheme") private var appTheme: String = "system"
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
     @AppStorage("loadAppIconsOnJIT") private var loadAppIconsOnJIT = true
-    @State private var selectedAccentColor: Color = .blue
+    @State private var selectedAccentColor: Color = .white
     @Environment(\.colorScheme) private var colorScheme
     
     @State private var justSaved = false
     
     private var accentColor: Color {
         if customAccentColorHex.isEmpty {
-            return .blue
+            return .white
         } else {
-            return Color(hex: customAccentColorHex) ?? .blue
+            return Color(hex: customAccentColorHex) ?? .white
         }
+    }
+    
+    private var selectedTheme: AppTheme {
+        get { AppTheme(rawValue: appThemeRaw) ?? .system }
+        set { appThemeRaw = newValue.rawValue }
+    }
+    
+    private var hardcodedGradient: some View {
+        LinearGradient(
+            gradient: Gradient(colors: [
+                Color(UIColor.systemBackground),
+                Color(UIColor.secondarySystemBackground)
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background gradient (glassy style)
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(UIColor.systemBackground),
-                        Color(UIColor.secondarySystemBackground)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                hardcodedGradient.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 20) {
                         usernameCard
+                        accentCard
                         jitOptionsCard
                     }
                     .padding(.horizontal, 20)
@@ -130,9 +137,10 @@ struct DisplayView: View {
             .navigationTitle("Display")
             .onAppear {
                 loadCustomAccentColor()
-                applyTheme(appTheme)
+                applyTheme(selectedTheme)
             }
         }
+        .tint(selectedAccentColor)
     }
     
     // MARK: - Cards
@@ -180,6 +188,70 @@ struct DisplayView: View {
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
     }
     
+    private var accentCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Accent")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            AccentColorPicker(selectedColor: $selectedAccentColor)
+            
+            HStack(spacing: 12) {
+                Button {
+                    if let hex = selectedAccentColor.toHex() {
+                        customAccentColorHex = hex
+                    } else {
+                        customAccentColorHex = ""
+                    }
+                    showSavedToast()
+                } label: {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Save")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(selectedAccentColor)
+                    )
+                    .foregroundColor(selectedAccentColor.contrastText())
+                }
+                
+                Button {
+                    customAccentColorHex = ""
+                    selectedAccentColor = .white
+                    showSavedToast()
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.uturn.backward.circle")
+                        Text("Reset")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color(UIColor.tertiarySystemBackground))
+                    )
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+        .onChange(of: selectedAccentColor) { _, _ in
+        }
+    }
+    
     private var jitOptionsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("App List")
@@ -215,21 +287,15 @@ struct DisplayView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
             
-            HStack(spacing: 12) {
-                ThemeOptionButton(title: "System", imageName: "theme-system", isSelected: appTheme == "system", accentColor: accentColor) {
-                    appTheme = "system"
-                    applyTheme(appTheme)
-                    showSavedToast()
-                }
-                ThemeOptionButton(title: "Light", imageName: "theme-light", isSelected: appTheme == "light", accentColor: accentColor) {
-                    appTheme = "light"
-                    applyTheme(appTheme)
-                    showSavedToast()
-                }
-                ThemeOptionButton(title: "Dark", imageName: "theme-dark", isSelected: appTheme == "dark", accentColor: accentColor) {
-                    appTheme = "dark"
-                    applyTheme(appTheme)
-                    showSavedToast()
+            // Grid of theme previews
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(AppTheme.allCases, id: \.self) { theme in
+                    ThemePreviewCard(theme: theme, selected: selectedTheme == theme) {
+                        // Write directly to AppStorage to avoid mutating through a computed property
+                        appThemeRaw = theme.rawValue
+                        applyTheme(theme)
+                        showSavedToast()
+                    }
                 }
             }
         }
@@ -249,19 +315,20 @@ struct DisplayView: View {
     
     private func loadCustomAccentColor() {
         if customAccentColorHex.isEmpty {
-            selectedAccentColor = .blue
+            selectedAccentColor = .white
         } else {
-            selectedAccentColor = Color(hex: customAccentColorHex) ?? .blue
+            selectedAccentColor = Color(hex: customAccentColorHex) ?? .white
         }
     }
     
-    private func applyTheme(_ theme: String) {
+    private func applyTheme(_ theme: AppTheme) {
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first {
             switch theme {
-            case "dark": window.overrideUserInterfaceStyle = .dark
-            case "light": window.overrideUserInterfaceStyle = .light
-            default: window.overrideUserInterfaceStyle = .unspecified
+            case .darkStatic, .neonAnimated, .blobs, .particles:
+                window.overrideUserInterfaceStyle = .dark
+            case .system:
+                window.overrideUserInterfaceStyle = .unspecified
             }
         }
     }
@@ -274,35 +341,52 @@ struct DisplayView: View {
     }
 }
 
-// MARK: - Theme Option Button (Glassy style)
-struct ThemeOptionButton: View {
-    let title: String
-    let imageName: String
-    let isSelected: Bool
-    let accentColor: Color
+// MARK: - Theme Preview Card
+
+private struct ThemePreviewCard: View {
+    let theme: AppTheme
+    let selected: Bool
     let action: () -> Void
+    
+    private var hardcodedGradient: some View {
+        LinearGradient(
+            gradient: Gradient(colors: [
+                Color(UIColor.systemBackground),
+                Color(UIColor.secondarySystemBackground)
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                Image(imageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: 120)
-                    .cornerRadius(12)
+            ZStack {
+                hardcodedGradient
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isSelected ? accentColor : .clear, lineWidth: 2)
+                            .fill(.ultraThinMaterial)
+                            .padding(8)
                     )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(isSelected ? accentColor : .primary)
+                VStack(spacing: 6) {
+                    Text(theme.displayName)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
+                }
+                .padding(8)
             }
-            .padding(8)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .frame(height: 120)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(selected ? Color.accentColor : Color.white.opacity(0.12), lineWidth: selected ? 2 : 1)
+            )
             .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 2)
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
     }
 }

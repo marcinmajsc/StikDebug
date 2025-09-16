@@ -145,25 +145,19 @@ struct DeviceInfoView: View {
             || $0.value.localizedCaseInsensitiveContains(searchText)
         }
     }
+    
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Subtle depth but same color scheme
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(UIColor.systemBackground),
-                        Color(UIColor.secondarySystemBackground)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                ThemedBackground(style: currentTheme.backgroundStyle)
+                    .ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 20) {
                         infoCard
-                        versionInfo
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 30)
@@ -272,7 +266,6 @@ struct DeviceInfoView: View {
 
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Glassy search field
             TextField("Search device info…", text: $searchText)
                 .padding(12)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -322,17 +315,6 @@ struct DeviceInfoView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
-    }
-
-    private var versionInfo: some View {
-        HStack {
-            Spacer()
-            Text("iOS \(UIDevice.current.systemVersion)")
-                .font(.footnote)
-                .foregroundColor(.secondary)
-            Spacer()
-        }
-        .padding(.top, 6)
     }
 
     // MARK: - Copy / Share helpers

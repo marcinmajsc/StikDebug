@@ -24,19 +24,16 @@ private func registerAdvancedOptionsDefault() {
 struct WelcomeSheetView: View {
     var onDismiss: (() -> Void)?
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    
+    private var accent: Color {
+        customAccentColorHex.isEmpty ? .accentColor : (Color(hex: customAccentColorHex) ?? .accentColor)
+    }
     
     var body: some View {
         ZStack {
-            // Subtle gradient background to match app style
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(UIColor.systemBackground),
-                    Color(UIColor.secondarySystemBackground)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // Background now comes from global BackgroundContainer
+            Color.clear.ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 20) {
@@ -57,7 +54,7 @@ struct WelcomeSheetView: View {
                         // App description
                         VStack(alignment: .leading, spacing: 6) {
                             Label("On‑device debugger", systemImage: "bolt.shield.fill")
-                                .foregroundColor(.white)
+                                .foregroundColor(accent)
                                 .font(.headline)
                             Text("StikDebug is an on‑device debugger designed specifically for self‑developed apps. It helps streamline testing and troubleshooting without sending any data to external servers.")
                                 .font(.callout)
@@ -68,7 +65,7 @@ struct WelcomeSheetView: View {
                         // VPN explanation
                         VStack(alignment: .leading, spacing: 6) {
                             Label("Why VPN permission?", systemImage: "lock.shield.fill")
-                                .foregroundColor(.white)
+                                .foregroundColor(accent)
                                 .font(.headline)
                             Text("The next step will prompt you to allow VPN permissions. This is necessary for the app to function properly. The VPN configuration allows your device to securely connect to itself — nothing more. No data is collected or sent externally; everything stays on your device.")
                                 .font(.callout)
@@ -80,12 +77,16 @@ struct WelcomeSheetView: View {
                         Button(action: { onDismiss?() }) {
                             Text("Continue")
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .foregroundColor(.black)
+                                .foregroundColor(accent.contrastText())
                                 .frame(height: 44)
                                 .frame(maxWidth: .infinity)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color.white)
+                                        .fill(accent)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Color.primary.opacity(0.15), lineWidth: 1)
                                 )
                         }
                         .padding(.top, 8)
@@ -97,11 +98,11 @@ struct WelcomeSheetView: View {
                             .fill(.ultraThinMaterial)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                             )
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.15 : 0.08), radius: 12, x: 0, y: 4)
                     
                     // Footer version info for consistency
                     HStack {
@@ -117,7 +118,7 @@ struct WelcomeSheetView: View {
                 .padding(.vertical, 30)
             }
         }
-        .preferredColorScheme(.dark)
+        // Inherit preferredColorScheme from BackgroundContainer (no local override)
     }
 }
 
@@ -322,7 +323,7 @@ class TunnelManager: ObservableObject {
 // MARK: - AccentColor Environment Key (leave available but unused)
 
 struct AccentColorKey: EnvironmentKey {
-    static let defaultValue: Color = .white
+    static let defaultValue: Color = .accentColor
 }
 
 extension EnvironmentValues {
@@ -406,7 +407,7 @@ class DNSChecker: ObservableObject {
                     group.leave()
                 }
                 
-                group.notify(queue: DispatchQueue.main) {
+                group.notify(queue: .main) {
                     if self.controlIP == nil {
                         self.dnsError = "No internet connection."
                         print("Control host lookup failed, so no internet connection.")
@@ -430,11 +431,7 @@ class DNSChecker: ObservableObject {
     private func checkIfConnectedToWifi(completion: @escaping (Bool) -> Void) {
         let monitor = NWPathMonitor(requiredInterfaceType: .wifi)
         monitor.pathUpdateHandler = { path in
-            if path.status == .satisfied {
-                completion(true)
-            } else {
-                completion(false)
-            }
+            completion(path.status == .satisfied)
             monitor.cancel()
         }
         let queue = DispatchQueue.global(qos: .background)
@@ -456,9 +453,7 @@ class DNSChecker: ObservableObject {
             var res: UnsafeMutablePointer<addrinfo>?
             let err = getaddrinfo(host, nil, &hints, &res)
             if err != 0 {
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                DispatchQueue.main.async { completion(nil) }
                 return
             }
             
@@ -477,9 +472,7 @@ class DNSChecker: ObservableObject {
                 ptr = ptr?.pointee.ai_next
             }
             freeaddrinfo(res)
-            DispatchQueue.main.async {
-                completion(ipAddress)
-            }
+            DispatchQueue.main.async { completion(ipAddress) }
         }
     }
 }
@@ -492,6 +485,8 @@ var pubHeartBeat = false
 @main
 struct HeartbeatApp: App {
     @AppStorage("hasLaunchedBefore") var hasLaunchedBefore: Bool = false
+    @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
     @State private var showWelcomeSheet: Bool = false
     @State private var isLoading2 = true
     @State private var isPairing = false
@@ -529,14 +524,15 @@ struct HeartbeatApp: App {
         let origMethod = class_getInstanceMethod(UIDocumentPickerViewController.self, #selector(UIDocumentPickerViewController.init(forOpeningContentTypes:asCopy:)))!
         method_exchangeImplementations(origMethod, fixMethod)
         
-        // Force global dark mode for the entire app
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            window.overrideUserInterfaceStyle = .dark
-        }
-        
-        // Ensure UIKit controls also use white tint globally
-        UIView.appearance().tintColor = .white
+        // Initialize UIKit tint from stored accent at launch
+        HeartbeatApp.updateUIKitTintFromStoredAccent()
+    }
+    
+    // Make this static so we can call it without capturing self in init
+    private static func updateUIKitTintFromStoredAccent() {
+        let hex = UserDefaults.standard.string(forKey: "customAccentColor") ?? ""
+        let color = hex.isEmpty ? UIColor.tintColor : UIColor(Color(hex: hex) ?? .accentColor)
+        UIView.appearance().tintColor = color
     }
     
     func newVerCheck() {
@@ -557,188 +553,195 @@ struct HeartbeatApp: App {
         }
     }
     
+    private var globalAccent: Color {
+        let hex = customAccentColorHex
+        return hex.isEmpty ? .accentColor : (Color(hex: hex) ?? .accentColor)
+    }
+    
     var body: some Scene {
         WindowGroup {
-            Group {
-                if isLoading2 {
-                    LoadingView(showAlert: $show_alert, alertTitle: $alert_title, alertMessage: $alert_string)
-                        .onAppear {
-                            dnsChecker.checkDNS()
-                            timeoutTimer?.invalidate()
-                            timeoutTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { _ in
-                                if isLoading2 {
-                                    showTimeoutError = true
+            BackgroundContainer {
+                Group {
+                    if isLoading2 {
+                        LoadingView(showAlert: $show_alert, alertTitle: $alert_title, alertMessage: $alert_string)
+                            .onAppear {
+                                dnsChecker.checkDNS()
+                                timeoutTimer?.invalidate()
+                                timeoutTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { _ in
+                                    if isLoading2 {
+                                        showTimeoutError = true
+                                    }
                                 }
-                            }
-                            checkVPNConnection() { result, vpn_error in
-                                if result {
-                                    if FileManager.default.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path) {
-                                        Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
-                                            if pubHeartBeat {
-                                                isLoading2 = false
-                                                timer.invalidate()
-                                            } else {
-                                                if let error {
-                                                    if error == -9 {  // InvalidHostID is -9
-                                                        isPairing = true
-                                                    } else {
-                                                        startHeartbeatInBackground()
+                                checkVPNConnection() { result, vpn_error in
+                                    if result {
+                                        if FileManager.default.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path) {
+                                            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+                                                if pubHeartBeat {
+                                                    isLoading2 = false
+                                                    timer.invalidate()
+                                                } else {
+                                                    if let error {
+                                                        if error == -9 {  // InvalidHostID is -9
+                                                            isPairing = true
+                                                        } else {
+                                                            startHeartbeatInBackground()
+                                                        }
+                                                        self.error = nil
                                                     }
-                                                    self.error = nil
                                                 }
                                             }
-                                        }
-                                        startHeartbeatInBackground()
-                                    } else {
-                                        isLoading2 = false
-                                    }
-                                } else if let vpn_error {
-                                    showAlert(title: "Error", message: "EM Proxy failed to connect: \(vpn_error)", showOk: true) { _ in
-                                        exit(0)
-                                    }
-                                }
-                            }
-                        }
-                        .fileImporter(
-                            isPresented: $isPairing,
-                            allowedContentTypes: [
-                                UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data)!,
-                                .propertyList
-                            ]
-                        ) { result in
-                            switch result {
-                            case .success(let url):
-                                let fileManager = FileManager.default
-                                let accessing = url.startAccessingSecurityScopedResource()
-                                
-                                if fileManager.fileExists(atPath: url.path) {
-                                    do {
-                                        if fileManager.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path) {
-                                            try fileManager.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
-                                        }
-                                        try fileManager.copyItem(at: url, to: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
-                                        print("File copied successfully!")
-                                        startHeartbeatInBackground()
-                                    } catch {
-                                        print("Error copying file: \(error)")
-                                    }
-                                } else {
-                                    print("Source file does not exist.")
-                                }
-                                
-                                if accessing {
-                                    url.stopAccessingSecurityScopedResource()
-                                }
-                            case .failure(_):
-                                print("Failed")
-                            }
-                        }
-                        .overlay(
-                            ZStack {
-                                if showTimeoutError {
-                                    CustomErrorView(
-                                        title: "Connection Error",
-                                        message: "Check your connection and ensure your pairing file is valid and try again.",
-                                        onDismiss: {
-                                            showTimeoutError = false
-                                        },
-                                        showButton: true,
-                                        primaryButtonText: "Continue Anyway",
-                                        secondaryButtonText: "View Logs",
-                                        onPrimaryButtonTap: {
-                                            showContinueWarning = true
-                                        },
-                                        onSecondaryButtonTap: {
-                                            showLogs = true
-                                        },
-                                        showSecondaryButton: true
-                                    )
-                                }
-
-                                if showContinueWarning {
-                                    CustomErrorView(
-                                        title: "Proceeding Without Connection",
-                                        message: "StikDebug will not function as expected if you choose to continue.",
-                                        onDismiss: {
-                                            showContinueWarning = false
-                                        },
-                                        showButton: true,
-                                        primaryButtonText: "I Understand",
-                                        onPrimaryButtonTap: {
-                                            showContinueWarning = false
+                                            startHeartbeatInBackground()
+                                        } else {
                                             isLoading2 = false
                                         }
-                                    )
-                                }
-                            }
-                        )
-                        .sheet(isPresented: $showLogs, onDismiss: {
-                            isLoading2 = false
-                        }) {
-                            ConsoleLogsView()
-                                .preferredColorScheme(.dark)
-                        }
-                } else {
-                    MainTabView()
-                        .onAppear {
-                            // Force dark mode on main window as well
-                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                               let window = windowScene.windows.first {
-                                window.overrideUserInterfaceStyle = .dark
-                            }
-                            let fileManager = FileManager.default
-                            for (index, urlString) in urls.enumerated() {
-                                let destinationURL = URL.documentsDirectory.appendingPathComponent(outputFiles[index])
-                                if !fileManager.fileExists(atPath: destinationURL.path) {
-                                    downloadFile(from: urlString, to: destinationURL) { result in
-                                        if (result != "") {
-                                            alert_title = "An Error has Occurred"
-                                            alert_string = "[Download DDI Error]: " + result
-                                            show_alert = true
+                                    } else if let vpn_error {
+                                        showAlert(title: "Error", message: "EM Proxy failed to connect: \(vpn_error)", showOk: true) { _ in
+                                            exit(0)
                                         }
                                     }
                                 }
                             }
-                        }
-                        .overlay(
-                            ZStack {
-                                if show_alert {
-                                    CustomErrorView(
-                                        title: alert_title,
-                                        message: alert_string,
-                                        onDismiss: {
-                                            show_alert = false
-                                        },
-                                        showButton: true,
-                                        primaryButtonText: "OK"
-                                    )
+                            .fileImporter(
+                                isPresented: $isPairing,
+                                allowedContentTypes: [
+                                    UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data)!,
+                                    .propertyList
+                                ]
+                            ) { result in
+                                switch result {
+                                case .success(let url):
+                                    let fileManager = FileManager.default
+                                    let accessing = url.startAccessingSecurityScopedResource()
+                                    
+                                    if fileManager.fileExists(atPath: url.path) {
+                                        do {
+                                            if fileManager.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path) {
+                                                try fileManager.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
+                                            }
+                                            try fileManager.copyItem(at: url, to: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
+                                            print("File copied successfully!")
+                                            startHeartbeatInBackground()
+                                        } catch {
+                                            print("Error copying file: \(error)")
+                                        }
+                                    } else {
+                                        print("Source file does not exist.")
+                                    }
+                                    
+                                    if accessing {
+                                        url.stopAccessingSecurityScopedResource()
+                                    }
+                                case .failure(_):
+                                    print("Failed")
                                 }
                             }
-                        )
-                        .preferredColorScheme(.dark)
+                            .overlay(
+                                ZStack {
+                                    if showTimeoutError {
+                                        CustomErrorView(
+                                            title: "Connection Error",
+                                            message: "Check your connection and ensure your pairing file is valid and try again.",
+                                            onDismiss: {
+                                                showTimeoutError = false
+                                            },
+                                            showButton: true,
+                                            primaryButtonText: "Continue Anyway",
+                                            secondaryButtonText: "View Logs",
+                                            onPrimaryButtonTap: {
+                                                showContinueWarning = true
+                                            },
+                                            onSecondaryButtonTap: {
+                                                showLogs = true
+                                            },
+                                            showSecondaryButton: true
+                                        )
+                                    }
+
+                                    if showContinueWarning {
+                                        CustomErrorView(
+                                            title: "Proceeding Without Connection",
+                                            message: "StikDebug will not function as expected if you choose to continue.",
+                                            onDismiss: {
+                                                showContinueWarning = false
+                                            },
+                                            showButton: true,
+                                            primaryButtonText: "I Understand",
+                                            onPrimaryButtonTap: {
+                                                showContinueWarning = false
+                                                isLoading2 = false
+                                            }
+                                        )
+                                    }
+                                }
+                            )
+                            .sheet(isPresented: $showLogs, onDismiss: {
+                                isLoading2 = false
+                            }) {
+                                ConsoleLogsView()
+                            }
+                    } else {
+                        MainTabView()
+                            .onAppear {
+                                let fileManager = FileManager.default
+                                for (index, urlString) in urls.enumerated() {
+                                    let destinationURL = URL.documentsDirectory.appendingPathComponent(outputFiles[index])
+                                    if !fileManager.fileExists(atPath: destinationURL.path) {
+                                        downloadFile(from: urlString, to: destinationURL) { result in
+                                            if (result != "") {
+                                                alert_title = "An Error has Occurred"
+                                                alert_string = "[Download DDI Error]: " + result
+                                                show_alert = true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .overlay(
+                                ZStack {
+                                    if show_alert {
+                                        CustomErrorView(
+                                            title: alert_title,
+                                            message: alert_string,
+                                            onDismiss: {
+                                                show_alert = false
+                                            },
+                                            showButton: true,
+                                            primaryButtonText: "OK"
+                                        )
+                                    }
+                                }
+                            )
+                    }
+                }
+                // Apply global tint to all SwiftUI views in this window
+                .tint(globalAccent)
+                .onAppear {
+                    // On first launch, present the welcome sheet.
+                    // Otherwise, start the VPN automatically.
+                    if !hasLaunchedBefore {
+                        showWelcomeSheet = true
+                    } else {
+                        TunnelManager.shared.startVPN()
+                    }
+                    // Update UIKit tint now and subscribe to changes without capturing self
+                    HeartbeatApp.updateUIKitTintFromStoredAccent()
+                    NotificationCenter.default.addObserver(
+                        forName: UserDefaults.didChangeNotification,
+                        object: nil,
+                        queue: .main
+                    ) { _ in
+                        HeartbeatApp.updateUIKitTintFromStoredAccent()
+                    }
+                }
+                .sheet(isPresented: $showWelcomeSheet) {
+                    WelcomeSheetView {
+                        // When the user taps "Continue", mark the app as launched and start the VPN.
+                        hasLaunchedBefore = true
+                        showWelcomeSheet = false
+                        TunnelManager.shared.startVPN()
+                    }
                 }
             }
-            // Apply global white tint to all SwiftUI views in the window
-            .tint(Color.white)
-            .onAppear {
-                // On first launch, present the welcome sheet.
-                // Otherwise, start the VPN automatically.
-                if !hasLaunchedBefore {
-                    showWelcomeSheet = true
-                } else {
-                    TunnelManager.shared.startVPN()
-                }
-            }
-            .sheet(isPresented: $showWelcomeSheet) {
-                WelcomeSheetView {
-                    // When the user taps "Continue", mark the app as launched and start the VPN.
-                    hasLaunchedBefore = true
-                    showWelcomeSheet = false
-                    TunnelManager.shared.startVPN()
-                }
-                .preferredColorScheme(.dark)
-            }
-            .preferredColorScheme(.dark)
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
@@ -804,7 +807,7 @@ actor FunctionGuard<T> {
     
     func execute(_ work: @escaping @Sendable () -> T) async -> T {
         if let task = runningTask {
-            return await task.value // Return existing task's result if running
+            return await task.value
         }
         let task = Task.detached { work() }
         runningTask = task
@@ -903,7 +906,6 @@ func startHeartbeatInBackground() {
             } else {
                 print("Error: \(message ?? "") (Code: \(result))")
                 DispatchQueue.main.async {
-                    // Special handling for InvalidHostID error (code -9)
                     if result == -9 {
                         do {
                             try FileManager.default.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
@@ -951,32 +953,45 @@ struct LoadingView: View {
     
     @State private var animate = false
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    
+    private var accentColor: Color {
+        if customAccentColorHex.isEmpty {
+            return .accentColor
+        } else {
+            return Color(hex: customAccentColorHex) ?? .accentColor
+        }
+    }
     
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            // Background now comes from global BackgroundContainer
+            Color.clear.ignoresSafeArea()
             
             VStack {
                 ZStack {
                     Circle()
                         .stroke(lineWidth: 8)
-                        .foregroundColor(Color.white.opacity(0.15))
+                        .foregroundColor(accentColor.opacity(0.18))
                         .frame(width: 80, height: 80)
                     
                     Circle()
                         .trim(from: 0, to: 0.7)
-                        .stroke(AngularGradient(
-                            gradient: Gradient(colors: [
-                                Color.white.opacity(0.9),
-                                Color.white.opacity(0.4)
-                            ]),
-                            center: .center
-                        ), style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                        .stroke(
+                            AngularGradient(
+                                gradient: Gradient(colors: [
+                                    accentColor.opacity(0.95),
+                                    accentColor.opacity(0.45)
+                                ]),
+                                center: .center
+                            ),
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                        )
                         .rotationEffect(.degrees(animate ? 360 : 0))
                         .frame(width: 80, height: 80)
                         .animation(Animation.linear(duration: 1.2).repeatForever(autoreverses: false), value: animate)
                 }
-                .shadow(color: Color.white.opacity(0.25), radius: 10, x: 0, y: 0)
+                .shadow(color: accentColor.opacity(0.25), radius: 10, x: 0, y: 0)
                 .onAppear {
                     animate = true
                     let os = ProcessInfo.processInfo.operatingSystemVersion
@@ -989,13 +1004,13 @@ struct LoadingView: View {
                 
                 Text("Loading...")
                     .font(.system(size: 20, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.85))
+                    .foregroundColor(.primary)
                     .padding(.top, 20)
                     .opacity(animate ? 1.0 : 0.5)
                     .animation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: animate)
             }
         }
-        .preferredColorScheme(.dark)
+        // Inherit system color scheme
     }
 }
 
@@ -1094,3 +1109,4 @@ func downloadFile(from urlString: String, to destinationURL: URL, completion: @e
     task.resume()
     completion("")
 }
+

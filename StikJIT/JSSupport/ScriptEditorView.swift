@@ -25,7 +25,7 @@ struct ScriptEditorView: View {
                 text:     $scriptContent,
                 position: $position,
                 messages: $messages,
-                language: .swift() // ← JavaScript syntax highlighting
+                language: .swift()
             )
             .font(.system(.footnote, design: .monospaced))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -36,7 +36,6 @@ struct ScriptEditorView: View {
 
             Divider()
 
-            // Equal-width, centered, rounded-rectangle buttons
             HStack(spacing: 12) {
                 WideGlassyButton(title: "Cancel", systemImage: "xmark") {
                     dismiss()
@@ -81,12 +80,12 @@ private struct WideGlassyButton: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .frame(maxWidth: .infinity, alignment: .center) // center label+icon
+            .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 10)
             .padding(.horizontal, 14)
         }
         .frame(height: 44)
-        .frame(maxWidth: .infinity) // equal widths within HStack
+        .frame(maxWidth: .infinity) 
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.ultraThinMaterial)

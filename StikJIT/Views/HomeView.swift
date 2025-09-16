@@ -52,6 +52,11 @@ struct HomeView: View {
     
     @StateObject private var tunnel = TunnelManager.shared
     @State private var heartbeatOK = false
+
+    @AppStorage("showiOS26Disclaimer") private var showiOS26Disclaimer: Bool = true
+    
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
     
     private var accentColor: Color {
         if customAccentColorHex.isEmpty { return .white }
@@ -60,22 +65,25 @@ struct HomeView: View {
 
     private var ddiMounted: Bool { isMounted() }
     private var canConnectByApp: Bool { pairingFileExists && ddiMounted }
+    
+    private var isOnOrAfteriOS26: Bool {
+        let v = ProcessInfo.processInfo.operatingSystemVersion
+        return v.majorVersion >= 26
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(UIColor.systemBackground),
-                        Color(UIColor.secondarySystemBackground)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                ThemedBackground(style: currentTheme.backgroundStyle)
+                    .ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 20) {
+                        if isOnOrAfteriOS26 || showiOS26Disclaimer {
+                            disclaimerCard
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+
                         topStatusAndActionsCard
                         toolsCard
                         tipsCard
@@ -131,7 +139,7 @@ struct HomeView: View {
                 if fileManager.fileExists(atPath: url.path) {
                     do {
                         let dest = URL.documentsDirectory.appendingPathComponent("pairingFile.plist")
-                        if fileManager.fileExists(atPath: dest.path) {
+                        if FileManager.default.fileExists(atPath: dest.path) {
                             try fileManager.removeItem(at: dest)
                         }
                         try fileManager.copyItem(at: url, to: dest)
@@ -174,7 +182,47 @@ struct HomeView: View {
                 bundleID = selectedBundle
                 isShowingInstalledApps = false
                 HapticFeedbackHelper.trigger()
-                startJITInBackground(bundleID: selectedBundle)
+                
+                var autoScriptData: Data? = nil
+                var autoScriptName: String? = nil
+                
+                let appName: String? = (try? JITEnableContext.shared.getAppList()[selectedBundle])
+                
+                if #available(iOS 26, *) {
+                    if ProcessInfo.processInfo.hasTXM, let appName {
+                        if appName == "maciOS" {
+                            if let url = Bundle.main.url(forResource: "script1", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "script1.js"
+                            }
+                        } else if appName == "Amethyst" {
+                            if let url = Bundle.main.url(forResource: "script2", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "script2.js"
+                            }
+                        } else if appName == "MeloNX" {
+                            if let url = Bundle.main.url(forResource: "melo", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "melo.js"
+                            }
+                        } else if appName == "UTM" {
+                            if let url = Bundle.main.url(forResource: "utmjit", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "utmjit.js"
+                            }
+                        }
+                    }
+                }
+                
+                startJITInBackground(bundleID: selectedBundle,
+                                     pid: nil,
+                                     scriptData: autoScriptData,
+                                     scriptName: autoScriptName,
+                                     triggeredByURLScheme: false)
             }
         }
         .pipify(isPresented: Binding(
@@ -344,8 +392,8 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .foregroundColor(.black)
+        .background(accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .foregroundColor(accentColor.contrastText())
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
@@ -356,7 +404,18 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Tools").font(.headline).foregroundColor(.secondary)
             Button(action: { showingConsoleLogsView = true }) {
-                whiteCardButtonLabel(icon: "terminal", title: "Open Console")
+                HStack {
+                    Image(systemName: "terminal").font(.system(size: 20))
+                    Text("Open Console").font(.system(.title3, design: .rounded)).fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .foregroundColor(accentColor.contrastText())
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+                )
             }
             .sheet(isPresented: $showingConsoleLogsView) { ConsoleLogsView() }
         }
@@ -382,6 +441,32 @@ struct HomeView: View {
                 tipRow(systemImage: "externaldrive.badge.exclamationmark", title: "Developer Disk Image not mounted", message: "Go to Settings → Developer Disk Image and ensure it’s mounted.")
             }
             tipRow(systemImage: "lock.shield", title: "Local only", message: "StikDebug runs entirely on-device. No data leaves your device.")
+            
+            Button {
+                if let url = URL(string: "https://github.com/StephenDev0/StikDebug-Guide/blob/main/pairing_file.md") {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundColor(accentColor)
+                        .font(.system(size: 18))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Pairing File Guide")
+                            .font(.subheadline).fontWeight(.semibold)
+                        Text("Learn how to create and import your pairing file.")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                        .padding(.top, 2)
+                }
+                .padding(.vertical, 4)
+            }
+            .buttonStyle(.plain)
         }
         .padding(20)
         .background(
@@ -467,7 +552,7 @@ struct HomeView: View {
         }
     }
     
-    private func startJITInBackground(bundleID: String? = nil, pid : Int? = nil, scriptData: Data? = nil, scriptName : String? = nil, triggeredByURLScheme: Bool = false) {
+    private func startJITInBackground(bundleID: String? = nil, pid : Int? = nil, scriptData: Data? = nil, scriptName: String? = nil, triggeredByURLScheme: Bool = false) {
         isProcessing = true
         LogManager.shared.addInfoLog("Starting Debug for \(bundleID ?? String(pid ?? 0))")
         
@@ -487,14 +572,16 @@ struct HomeView: View {
                     }
                 }
             } else {
-                scriptData = nil
+                // keep passed-in auto script if provided; otherwise nil
             }
             
             var callback: DebugAppCallback? = nil
-            if let sd = scriptData {
+            if ProcessInfo.processInfo.hasTXM, let sd = scriptData {
                 callback = getJsCallback(sd, name: scriptName ?? bundleID ?? "Script")
                 if triggeredByURLScheme { usleep(500000) }
                 pipRequired = true
+            } else {
+                pipRequired = false
             }
             
             let logger: LogFunc = { message in if let message { LogManager.shared.addInfoLog(message) } }
@@ -534,6 +621,56 @@ struct HomeView: View {
         if pad < 4 { base64 += String(repeating: "=", count: pad) }
         return base64
     }
+    
+    // MARK: - iOS 26+ Disclaimer Card (above main card)
+    
+    private var disclaimerCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.yellow)
+                .imageScale(.large)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Important for iOS 26+")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+                Text("Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            
+            if !isOnOrAfteriOS26 {
+                Button {
+                    withAnimation {
+                        showiOS26Disclaimer = false
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .foregroundColor(.secondary)
+                        .padding(8)
+                        .background(
+                            Circle().fill(Color(UIColor.tertiarySystemBackground))
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing.")
+    }
 }
 
 private struct StatusDot: View {
@@ -567,25 +704,18 @@ private struct ConnectByPIDSheet: View {
         return false
     }
     
+    private let capsuleHeight: CGFloat = 40
+    
     var body: some View {
         NavigationView {
             ZStack {
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(UIColor.systemBackground),
-                        Color(UIColor.secondarySystemBackground)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                Color.clear.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Enter a Process ID").font(.headline).foregroundColor(.primary)
                             
-                            // TextField + Clear control
                             TextField("e.g. 1234", text: $pidText)
                                 .keyboardType(.numberPad)
                                 .textContentType(.oneTimeCode)
@@ -604,7 +734,7 @@ private struct ConnectByPIDSheet: View {
 
                             // Paste + Clear row
                             HStack(spacing: 10) {
-                                CapsuleButton(systemName: "doc.on.clipboard", title: "Paste") {
+                                CapsuleButton(systemName: "doc.on.clipboard", title: "Paste", height: capsuleHeight) {
                                     if let n = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
                                        let v = Int(n), v > 0 {
                                         pidText = String(v)
@@ -616,7 +746,7 @@ private struct ConnectByPIDSheet: View {
                                     }
                                 }
 
-                                CapsuleButton(systemName: "xmark", title: "Clear") {
+                                CapsuleButton(systemName: "xmark", title: "Clear", height: capsuleHeight) {
                                     pidText = ""
                                     errorText = nil
                                 }
@@ -677,8 +807,8 @@ private struct ConnectByPIDSheet: View {
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background((isValid ? Color.white : Color.white.opacity(0.6)), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                .foregroundColor(.black)
+                                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .foregroundColor(Color.accentColor.contrastText())
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                                         .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
@@ -743,28 +873,36 @@ private struct ConnectByPIDSheet: View {
         }
     }
     
-    @ViewBuilder private func CapsuleButton(systemName: String, title: String, action: @escaping () -> Void) -> some View {
+    @ViewBuilder private func CapsuleButton(systemName: String, title: String, height: CGFloat = 40, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: systemName)
                 Text(title).font(.subheadline.weight(.semibold))
             }
-            .padding(.vertical, 8)
+            .frame(height: height) // enforce uniform height
             .padding(.horizontal, 12)
             .background(Capsule(style: .continuous).fill(Color(UIColor.tertiarySystemBackground)))
         }
-    }
-}
-
-// MARK: - InstalledAppsViewModel
-
-class InstalledAppsViewModel: ObservableObject {
-    @Published var apps: [String: String] = [:]
-    init() { loadApps() }
-    func loadApps() {
-        do { self.apps = try JITEnableContext.shared.getAppList() }
-        catch { print(error); self.apps = [:] }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
     }
 }
 
 #Preview { HomeView() }
+
+// MARK: - TXM detection
+
+public extension ProcessInfo {
+    var hasTXM: Bool {
+        {
+            if let boot = FileManager.default.filePath(atPath: "/System/Volumes/Preboot", withLength: 36),
+               let file = FileManager.default.filePath(atPath: "\(boot)/boot", withLength: 96) {
+                return access("\(file)/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4", F_OK) == 0
+            } else {
+                return (FileManager.default.filePath(atPath: "/private/preboot", withLength: 96).map {
+                    access("\($0)/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4", F_OK) == 0
+                }) ?? false
+            }
+        }()
+    }
+}

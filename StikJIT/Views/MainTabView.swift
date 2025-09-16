@@ -21,6 +21,9 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack {
+            // Allow global themed background to show
+            Color.clear.ignoresSafeArea()
+            
             // Main tabs
             TabView(selection: $selection) {
                 HomeView()
@@ -39,22 +42,16 @@ struct MainTabView: View {
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     .tag(4)
             }
+            .id(customAccentColorHex)
+            .tint(accentColor)
+            .preferredColorScheme(.dark)
             .onAppear {
                 checkForUpdate()
             }
 
-            // Force update overlay
             if showForceUpdate {
                 ZStack {
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color(UIColor.systemBackground),
-                            Color(UIColor.secondarySystemBackground)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
+                    Color.black.opacity(0.001).ignoresSafeArea()
 
                     VStack(spacing: 20) {
                         Text("Update Required")

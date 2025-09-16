@@ -41,7 +41,7 @@ struct InstalledAppsListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                BackgroundGradient().ignoresSafeArea()
+                Color.clear.ignoresSafeArea()
 
                 if viewModel.apps.isEmpty {
                     emptyState
@@ -569,4 +569,13 @@ extension Array: @retroactive RawRepresentable where Element: Codable {
 #Preview {
     InstalledAppsListView { _ in }
         .environment(\.colorScheme, .dark)
+}
+
+class InstalledAppsViewModel: ObservableObject {
+    @Published var apps: [String: String] = [:]
+    init() { loadApps() }
+    func loadApps() {
+        do { self.apps = try JITEnableContext.shared.getAppList() }
+        catch { print(error); self.apps = [:] }
+    }
 }
