@@ -10,7 +10,7 @@
 
 #include "heartbeat.h"
 #include "jit.h"
-#include "applist.h"
+#include "applist.h" // declares list_installed_apps_with_icons
 
 #include "JITEnableContext.h"
 #import "StikDebug-Swift.h"
@@ -75,14 +75,18 @@ JITEnableContext* sharedJITContext = nil;
 
     if (![fm fileExistsAtPath:pairingFileURL.path]) {
         NSLog(@"Pairing file not found!");
-        *error = [self errorWithStr:@"Pairing file not found!" code:-17];
+        if (error) {
+            *error = [self errorWithStr:@"Pairing file not found!" code:-17];
+        }
         return nil;
     }
 
     IdevicePairingFile* pairingFile = NULL;
     IdeviceFfiError* err = idevice_pairing_file_read(pairingFileURL.fileSystemRepresentation, &pairingFile);
     if (err) {
-        *error = [self errorWithStr:@"Failed to read pairing file!" code:err->code];
+        if (error) {
+            *error = [self errorWithStr:@"Failed to read pairing file!" code:err->code];
+        }
         return nil;
     }
     return pairingFile;
@@ -94,36 +98,31 @@ JITEnableContext* sharedJITContext = nil;
     NSError* err = nil;
     IdevicePairingFile* pairingFile = [self getPairingFileWithError:&err];
     if (err) {
-        // silently swallow “pairing file not found” (-17)
-        if (err.code == -17) {
+        if (err.code == -17) { // silently ignore "not found"
             return;
         }
-        // for all other errors, log and forward
-        if (logger) {
-            logger(err.localizedDescription);
-        }
-        completionHandler(err.code, err.localizedDescription);
+        if (logger) { logger(err.localizedDescription); }
+        if (completionHandler) { completionHandler((int)err.code, err.localizedDescription); }
         return;
     }
 
-    if(heartbeatRunning) {
-        return;
-    }
+    if (heartbeatRunning) { return; }
     startHeartbeat(
         pairingFile,
         &provider,
         &heartbeatRunning,
         ^(int result, const char *message) {
-            completionHandler(result,
-                              [NSString stringWithCString:message
-                                                 encoding:NSASCIIStringEncoding]);
+            if (completionHandler) {
+                completionHandler(result,
+                                  [NSString stringWithCString:message encoding:NSASCIIStringEncoding]);
+            }
         },
         [self createCLogger:logger]
     );
 }
 
 - (void)ensureHeartbeat {
-    // wait a bit until heartbeat finish. wait at most 10s
+    // wait a bit until heartbeat finishes. wait at most 10s
     int deadline = 50;
     while((!lastHeartbeatDate || [[NSDate now] timeIntervalSinceDate:lastHeartbeatDate] > 15) && deadline) {
         --deadline;
@@ -133,66 +132,97 @@ JITEnableContext* sharedJITContext = nil;
 
 - (BOOL)debugAppWithBundleID:(NSString*)bundleID logger:(LogFunc)logger jsCallback:(DebugAppCallback)jsCallback {
     if (!provider) {
-        if (logger) {
-            logger(@"Provider not initialized!");
-        }
+        if (logger) { logger(@"Provider not initialized!"); }
         NSLog(@"Provider not initialized!");
         return NO;
     }
-    
     [self ensureHeartbeat];
-    
-    return debug_app(provider,
-                     [bundleID UTF8String],
-                     [self createCLogger:logger], jsCallback) == 0;
+    return debug_app(provider, [bundleID UTF8String], [self createCLogger:logger], jsCallback) == 0;
 }
 
 - (BOOL)debugAppWithPID:(int)pid logger:(LogFunc)logger jsCallback:(DebugAppCallback)jsCallback {
     if (!provider) {
-        if (logger) {
-            logger(@"Provider not initialized!");
-        }
+        if (logger) { logger(@"Provider not initialized!"); }
         NSLog(@"Provider not initialized!");
         return NO;
     }
-    
     [self ensureHeartbeat];
-    
-    return debug_app_pid(provider,
-                     pid,
-                     [self createCLogger:logger], jsCallback) == 0;
+    return debug_app_pid(provider, pid, [self createCLogger:logger], jsCallback) == 0;
 }
 
+// Build a simple map bundleID -> appName from the richer structure.
 - (NSDictionary<NSString*, NSString*>*)getAppListWithError:(NSError**)error {
     if (!provider) {
         NSLog(@"Provider not initialized!");
-        *error = [self errorWithStr:@"Provider not initialized!" code:-1];
+        if (error) { *error = [self errorWithStr:@"Provider not initialized!" code:-1]; }
         return nil;
     }
 
     NSString* errorStr = nil;
-    NSDictionary<NSString*, NSString*>* apps = list_installed_apps(provider, &errorStr);
+    NSDictionary<NSString*, NSDictionary<NSString*, id>*>* full =
+        list_installed_apps_with_icons(provider, &errorStr);
     if (errorStr) {
-        *error = [self errorWithStr:errorStr code:-17];
+        if (error) { *error = [self errorWithStr:errorStr code:-17]; }
         return nil;
     }
-    return apps;
+    if (!full) { return @{}; }
+
+    NSMutableDictionary<NSString*, NSString*>* simple = [NSMutableDictionary dictionaryWithCapacity:full.count];
+    [full enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, NSDictionary<NSString *,id> * _Nonnull obj, BOOL * _Nonnull stop) {
+        NSString* name = obj[@"name"];
+        if (![name isKindOfClass:[NSString class]] || name.length == 0) { name = @"Unknown"; }
+        simple[key] = name;
+    }];
+    return simple.copy;
 }
 
+// Per-app icon fetcher using SpringBoardServices, mirroring applist.m behavior.
 - (UIImage*)getAppIconWithBundleId:(NSString*)bundleId error:(NSError**)error {
     if (!provider) {
         NSLog(@"Provider not initialized!");
-        *error = [self errorWithStr:@"Provider not initialized!" code:-1];
+        if (error) { *error = [self errorWithStr:@"Provider not initialized!" code:-1]; }
+        return nil;
+    }
+
+    SpringBoardServicesClientHandle *sbClient = NULL;
+    if (springboard_services_connect(provider, &sbClient)) {
+        if (error) { *error = [self errorWithStr:@"Failed to connect to SpringBoard Services" code:-17]; }
+        return nil;
+    }
+
+    void *pngData = NULL;
+    size_t dataLen = 0;
+    UIImage *icon = nil;
+    int rc = springboard_services_get_icon(sbClient, [bundleId UTF8String], &pngData, &dataLen);
+    if (rc == 0 && pngData && dataLen > 0) {
+        NSData *data = [NSData dataWithBytes:pngData length:dataLen];
+        free(pngData);
+        icon = [UIImage imageWithData:data];
+    } else {
+        if (pngData) { free(pngData); }
+        if (error) { *error = [self errorWithStr:@"Failed to fetch icon" code:rc ?: -17]; }
+    }
+
+    springboard_services_free(sbClient);
+    return icon;
+}
+
+// NEW: Expose the full app metadata (name, version, build, icon) to Swift callers.
+- (NSDictionary<NSString*, NSDictionary<NSString*, id>*>*)getDetailedAppListWithError:(NSError**)error {
+    if (!provider) {
+        NSLog(@"Provider not initialized!");
+        if (error) { *error = [self errorWithStr:@"Provider not initialized!" code:-1]; }
         return nil;
     }
 
     NSString* errorStr = nil;
-    UIImage* icon = getAppIcon(provider, bundleId, &errorStr);
+    NSDictionary<NSString*, NSDictionary<NSString*, id>*>* full =
+        list_installed_apps_with_icons(provider, &errorStr);
     if (errorStr) {
-        *error = [self errorWithStr:errorStr code:-17];
+        if (error) { *error = [self errorWithStr:errorStr code:-17]; }
         return nil;
     }
-    return icon;
+    return full ?: @{};
 }
 
 - (void)dealloc {

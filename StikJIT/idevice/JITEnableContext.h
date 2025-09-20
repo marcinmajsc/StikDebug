@@ -21,4 +21,10 @@ typedef void (^LogFunc)(NSString *message);
 - (BOOL)debugAppWithPID:(int)pid logger:(LogFunc)logger jsCallback:(DebugAppCallback)jsCallback;
 - (NSDictionary<NSString*, NSString*>*)getAppListWithError:(NSError**)error;
 - (UIImage*)getAppIconWithBundleId:(NSString*)bundleId error:(NSError**)error;
+
+// Detailed app list including name, version, build (and icon internally).
+// Returns a dictionary keyed by bundle ID. Each value has keys:
+// @"name" (NSString), @"version" (NSString), @"build" (NSString), @"icon" (UIImage or NSNull).
+- (NSDictionary<NSString*, NSDictionary<NSString*, id>*>*)getDetailedAppListWithError:(NSError**)error;
+
 @end

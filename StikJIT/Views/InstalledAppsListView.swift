@@ -31,11 +31,92 @@ struct InstalledAppsListView: View {
     @AppStorage("performanceMode") private var performanceMode = false
     @State private var showPerformanceToast = false
 
+    // iOS 26 Safe Mode (default ON)
+    @AppStorage("ios26SafeMode") private var ios26SafeMode = true
+    @State private var showSafeModeToast = false
+
     @Environment(\.dismiss) private var dismiss
     var onSelectApp: (String) -> Void
 
     private var filteredRecents: [String] {
         recentApps.filter { !favoriteApps.contains($0) }
+    }
+
+    // MARK: - Safe Mode filtering
+
+    private let allowedSafeNames: Set<String> = ["UTM", "MeloNX", "DolphiniOS", "maciOS", "Amethyst"]
+
+    // Semantic-like version compare: returns true if lhs >= rhs
+    private func isVersion(_ lhs: String, greaterOrEqual rhs: String) -> Bool {
+        guard !lhs.isEmpty else { return false }
+        if rhs.isEmpty { return true }
+        let a = lhs.split(separator: ".").map { Int($0) ?? 0 }
+        let b = rhs.split(separator: ".").map { Int($0) ?? 0 }
+        let n = max(a.count, b.count)
+        for i in 0..<n {
+            let av = i < a.count ? a[i] : 0
+            let bv = i < b.count ? b[i] : 0
+            if av != bv { return av > bv }
+        }
+        return true
+    }
+
+    // Single source of truth for Safe Mode eligibility (includes DolphiniOS exclusion under iOS 26 Safe Mode)
+    private func isAllowedInSafeMode(bundleID: String, meta: AppMeta) -> Bool {
+        guard allowedSafeNames.contains(meta.name) else { return false }
+        switch meta.name {
+        case "Amethyst", "maciOS":
+            return true
+        case "MeloNX":
+            return isVersion(meta.version, greaterOrEqual: "2.0.1")
+        case "UTM":
+            return isVersion(meta.version, greaterOrEqual: "4.7.4")
+        case "DolphiniOS":
+            // When iOS 26 Safe Mode is ON, exclude the variant whose bundle ID starts with com.joemattiello
+            if ios26SafeMode && bundleID.hasPrefix("com.joemattiello") { return false }
+            return true
+        default:
+            return false
+        }
+    }
+
+    // Final list of allowed bundle IDs under Safe Mode, capped to 5, deterministically ordered by (name, bundleID)
+    private var allowedSafeBundleIDs: [String] {
+        let filtered = viewModel.apps.compactMap { (bundleID, meta) -> String? in
+            isAllowedInSafeMode(bundleID: bundleID, meta: meta) ? bundleID : nil
+        }
+        let sorted = filtered.sorted { lhs, rhs in
+            let lMeta = viewModel.apps[lhs]
+            let rMeta = viewModel.apps[rhs]
+            if lMeta?.name != rMeta?.name {
+                return (lMeta?.name ?? "") < (rMeta?.name ?? "")
+            }
+            return lhs < rhs
+        }
+        return Array(sorted.prefix(5))
+    }
+
+    // Filter helpers for each section (when Safe Mode ON, derive from allowedSafeBundleIDs)
+    private var favoritesForDisplay: [String] {
+        guard ios26SafeMode else { return favoriteApps }
+        return favoriteApps.filter { allowedSafeBundleIDs.contains($0) }
+    }
+
+    private var recentsForDisplay: [String] {
+        guard ios26SafeMode else { return filteredRecents }
+        return filteredRecents.filter { allowedSafeBundleIDs.contains($0) }
+    }
+
+    private var allAppsForDisplay: [(String, AppMeta)] {
+        if ios26SafeMode {
+            let subset = allowedSafeBundleIDs.compactMap { bid -> (String, AppMeta)? in
+                guard let meta = viewModel.apps[bid] else { return nil }
+                return (bid, meta)
+            }
+            return subset
+        } else {
+            return viewModel.apps.sorted { $0.key < $1.key }
+        }
     }
 
     var body: some View {
@@ -67,10 +148,42 @@ struct InstalledAppsListView: View {
                     }
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showPerformanceToast)
                 }
+
+                if showSafeModeToast {
+                    VStack {
+                        Spacer()
+                        Text(ios26SafeMode ? "iOS 26 Safe Mode On" : "iOS 26 Safe Mode Off")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .shadow(radius: 4)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .padding(.bottom, 80)
+                    }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showSafeModeToast)
+                }
             }
-            .navigationTitle("Installed Apps".localized)
+            .navigationTitle("Installed Apps")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
+                    // Safe Mode toggle button
+                    Button {
+                        ios26SafeMode.toggle()
+                        Haptics.selection()
+                        showSafeModeToast = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            withAnimation { showSafeModeToast = false }
+                        }
+                    } label: {
+                        Image(systemName: ios26SafeMode ? "shield.checkered" : "shield.slash")
+                            .imageScale(.large)
+                            .foregroundStyle(ios26SafeMode ? .green : .secondary)
+                            .accessibilityLabel("Toggle iOS 26 Safe Mode")
+                            .accessibilityValue(ios26SafeMode ? "On" : "Off")
+                    }
+
+                    // Existing Performance Mode toggle
                     Button {
                         performanceMode.toggle()
                         Haptics.selection()
@@ -131,52 +244,64 @@ struct InstalledAppsListView: View {
     private var appsList: some View {
         ScrollView {
             VStack(spacing: 18) {
-                if !favoriteApps.isEmpty {
+                // Favorites
+                if !favoritesForDisplay.isEmpty {
                     glassSection(
-                        title: String(format: "Favorites (%d/4)".localized, favoriteApps.count)
+                        title: String(format: "Favorites (%d/4)", favoritesForDisplay.count)
                     ) {
                         LazyVStack(spacing: 12) {
-                            ForEach(favoriteApps, id: \.self) { bundleID in
-                                AppButton(
-                                    bundleID: bundleID,
-                                    appName: viewModel.apps[bundleID] ?? bundleID,
-                                    recentApps: $recentApps,
-                                    favoriteApps: $favoriteApps,
-                                    appIcons: $appIcons,
-                                    onSelectApp: onSelectApp,
-                                    sharedDefaults: sharedDefaults,
-                                    performanceMode: performanceMode
-                                )
+                            ForEach(favoritesForDisplay, id: \.self) { bundleID in
+                                if let meta = viewModel.apps[bundleID] {
+                                    AppButton(
+                                        bundleID: bundleID,
+                                        appName: meta.name,
+                                        version: meta.displayVersion,
+                                        recentApps: $recentApps,
+                                        favoriteApps: $favoriteApps,
+                                        appIcons: $appIcons,
+                                        onSelectApp: onSelectApp,
+                                        sharedDefaults: sharedDefaults,
+                                        performanceMode: performanceMode
+                                    )
+                                    .dolphinBadgeIfNeeded(appName: meta.name)
+                                }
                             }
                         }
                     }
                 }
 
-                if !filteredRecents.isEmpty {
-                    glassSection(title: "Recents".localized) {
+                // Recents
+                if !recentsForDisplay.isEmpty {
+                    glassSection(title: "Recents") {
                         LazyVStack(spacing: 12) {
-                            ForEach(filteredRecents, id: \.self) { bundleID in
-                                AppButton(
-                                    bundleID: bundleID,
-                                    appName: viewModel.apps[bundleID] ?? bundleID,
-                                    recentApps: $recentApps,
-                                    favoriteApps: $favoriteApps,
-                                    appIcons: $appIcons,
-                                    onSelectApp: onSelectApp,
-                                    sharedDefaults: sharedDefaults,
-                                    performanceMode: performanceMode
-                                )
+                            ForEach(recentsForDisplay, id: \.self) { bundleID in
+                                if let meta = viewModel.apps[bundleID] {
+                                    AppButton(
+                                        bundleID: bundleID,
+                                        appName: meta.name,
+                                        version: meta.displayVersion,
+                                        recentApps: $recentApps,
+                                        favoriteApps: $favoriteApps,
+                                        appIcons: $appIcons,
+                                        onSelectApp: onSelectApp,
+                                        sharedDefaults: sharedDefaults,
+                                        performanceMode: performanceMode
+                                    )
+                                    .dolphinBadgeIfNeeded(appName: meta.name)
+                                }
                             }
                         }
                     }
                 }
 
-                glassSection(title: "All Applications".localized) {
+                // All Applications
+                glassSection(title: "All Applications") {
                     LazyVStack(spacing: 12) {
-                        ForEach(viewModel.apps.sorted(by: { $0.key < $1.key }), id: \.key) { bundleID, appName in
+                        ForEach(allAppsForDisplay, id: \.0) { bundleID, meta in
                             AppButton(
                                 bundleID: bundleID,
-                                appName: appName,
+                                appName: meta.name,
+                                version: meta.displayVersion,
                                 recentApps: $recentApps,
                                 favoriteApps: $favoriteApps,
                                 appIcons: $appIcons,
@@ -184,6 +309,7 @@ struct InstalledAppsListView: View {
                                 sharedDefaults: sharedDefaults,
                                 performanceMode: performanceMode
                             )
+                            .dolphinBadgeIfNeeded(appName: meta.name)
                         }
                     }
                 }
@@ -211,7 +337,7 @@ struct InstalledAppsListView: View {
         .glassCard(material: .thinMaterial, strokeOpacity: 0.12)
     }
 
-    // MARK: Persistence gate (avoid redundant writes + reloads)
+    // MARK: Persistence gate
 
     private func persistIfChanged() {
         var touched = false
@@ -235,6 +361,7 @@ struct InstalledAppsListView: View {
 struct AppButton: View {
     let bundleID: String
     let appName: String
+    let version: String?
 
     @Binding var recentApps: [String]
     @Binding var favoriteApps: [String]
@@ -255,11 +382,22 @@ struct AppButton: View {
                 iconView
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(appName)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    // First line: App name + version (if present)
+                    HStack(spacing: 6) {
+                        Text(appName)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
 
+                        if let v = version, !v.isEmpty {
+                            Text(v)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    // Second line: bundle ID only
                     Text(bundleID)
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
@@ -493,16 +631,6 @@ final class IconCache {
 
 // MARK: - Shared UI Bits
 
-private struct BackgroundGradient: View {
-    var body: some View {
-        LinearGradient(
-            colors: [Color(UIColor.systemBackground), Color(UIColor.secondarySystemBackground)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
 private struct GlassCard: ViewModifier {
     var cornerRadius: CGFloat = 20
     var material: Material = .ultraThinMaterial
@@ -528,6 +656,31 @@ private extension View {
         strokeOpacity: Double = 0.15
     ) -> some View {
         modifier(GlassCard(cornerRadius: cornerRadius, material: material, strokeOpacity: strokeOpacity))
+    }
+}
+
+// Small badge modifier for DolphiniOS
+private extension View {
+    func dolphinBadgeIfNeeded(appName: String) -> some View {
+        overlay(alignment: .topTrailing) {
+            if appName == "DolphiniOS" {
+                // Yellow/gold badge
+                Text("Not working yet")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color(UIColor.label).opacity(0.9))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.yellow.opacity(0.85))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.orange.opacity(0.9), lineWidth: 0.6)
+                    )
+                    .padding(6)
+            }
+        }
     }
 }
 
@@ -571,11 +724,65 @@ extension Array: @retroactive RawRepresentable where Element: Codable {
         .environment(\.colorScheme, .dark)
 }
 
-class InstalledAppsViewModel: ObservableObject {
-    @Published var apps: [String: String] = [:]
-    init() { loadApps() }
-    func loadApps() {
-        do { self.apps = try JITEnableContext.shared.getAppList() }
-        catch { print(error); self.apps = [:] }
+// MARK: - ViewModel + Models
+
+struct AppMeta: Equatable {
+    let name: String
+    let version: String
+    let build: String
+
+    var displayVersion: String? {
+        if version.isEmpty && build.isEmpty { return nil }
+        if version.isEmpty { return "(\(build))" }
+        if build.isEmpty { return "v\(version)" }
+        return "v\(version) (\(build))"
     }
 }
+
+class InstalledAppsViewModel: ObservableObject {
+    @Published var apps: [String: AppMeta] = [:] // bundleID -> meta
+
+    init() { loadApps() }
+
+    func loadApps() {
+        // Prefer detailed list if available at runtime; else fallback to simple list.
+        if let detailed = getDetailedAppListIfAvailable() {
+            self.apps = detailed
+            return
+        }
+        do {
+            let simple = try JITEnableContext.shared.getAppList()
+            self.apps = simple.reduce(into: [:]) { dict, kv in
+                dict[kv.key] = AppMeta(name: kv.value, version: "", build: "")
+            }
+        } catch {
+            print(error)
+            self.apps = [:]
+        }
+    }
+
+    private func getDetailedAppListIfAvailable() -> [String: AppMeta]? {
+        let ctx = JITEnableContext.shared as AnyObject
+        let sel = NSSelectorFromString("getDetailedAppListWithError:")
+        guard ctx.responds(to: sel) else { return nil }
+
+        typealias ObjCFunc = @convention(c) (AnyObject, Selector, UnsafeMutablePointer<NSError?>?) -> NSDictionary?
+        guard let imp = ctx.method(for: sel) else { return nil }
+        let fn = unsafeBitCast(imp, to: ObjCFunc.self)
+        var err: NSError?
+        guard let dict = fn(ctx, sel, &err) as? [String: [String: Any]] else {
+            if let err { print("getDetailedAppList error: \(err.localizedDescription)") }
+            return nil
+        }
+
+        var out: [String: AppMeta] = [:]
+        for (bundleID, info) in dict {
+            let name = (info["name"] as? String) ?? "Unknown"
+            let version = (info["version"] as? String) ?? ""
+            let build = (info["build"] as? String) ?? ""
+            out[bundleID] = AppMeta(name: name, version: version, build: build)
+        }
+        return out
+    }
+}
+

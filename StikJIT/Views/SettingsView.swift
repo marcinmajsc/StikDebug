@@ -17,6 +17,8 @@ struct SettingsView: View {
     @AppStorage("enablePiP") private var enablePiP = false
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    // New: allow overriding TXM requirement
+    @AppStorage("ignoreTXMForScripts") private var ignoreTXMForScripts = false
     private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
     
     @State private var isShowingPairingFilePicker = false
@@ -308,6 +310,10 @@ struct SettingsView: View {
                     .tint(accentColor)
                 Toggle("Picture in Picture", isOn: $enablePiP)
                     .tint(accentColor)
+                // New: ignore TXM requirement toggle
+                Toggle("Ignore TXM requirement for scripts", isOn: $ignoreTXMForScripts)
+                    .tint(accentColor)
+                    .accessibilityHint("When enabled, scripts will run even if TXM is not detected. Use with caution.")
             }
             .onChange(of: enableAdvancedOptions) { _, newValue in
                 if !newValue {
@@ -576,3 +582,4 @@ class FolderViewController: UIViewController {
         }
     }
 }
+
