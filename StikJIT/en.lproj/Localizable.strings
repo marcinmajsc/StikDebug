@@ -40,8 +40,8 @@
 "Import your pairing file to get started." = "Import your pairing file to get started.";
 "Important for iOS 26+" = "Important for iOS 26+";
 "Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time." = "Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time.";
-"Processing pairing file…"
-"✓ Pairing file successfully imported"
+"Processing pairing file…" = "Processing pairing file…";
+"✓ Pairing file successfully imported" = "✓ Pairing file successfully imported";
 "Copied" = "Copied";
 "Error copying file" = "Error copying file";
 "Failed to import file" = "Failed to import file";
