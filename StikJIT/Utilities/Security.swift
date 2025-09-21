@@ -22,12 +22,12 @@ func SecTaskCreateFromSelf(
 
 func checkAppEntitlement(_ ent: String) -> Bool {
     guard let task = SecTaskCreateFromSelf(nil) else {
-        print("Failed to create SecTask")
+        print(NSLocalizedString("Failed to create SecTask", comment: ""))
         return false
     }
     
     guard let entitlements = SecTaskCopyValueForEntitlement(task, ent as NSString, nil) else {
-        print("Failed to get entitlements")
+        print(NSLocalizedString("Failed to get entitlements", comment: ""))
         return false
     }
     

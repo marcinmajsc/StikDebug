@@ -40,23 +40,23 @@ struct WelcomeSheetView: View {
                     // Card container with glassy material and stroke
                     VStack(alignment: .leading, spacing: 16) {
                         // Title
-                        Text("Welcome!")
+                        Text(NSLocalizedString("Welcome!", comment: ""))
                             .font(.system(.largeTitle, design: .rounded).weight(.bold))
                             .foregroundColor(.primary)
                             .padding(.top, 8)
                         
                         // Intro
-                        Text("Thanks for installing the app. This brief introduction will help you get started.")
+                        Text(NSLocalizedString("Thanks for installing the app. This brief introduction will help you get started.", comment: ""))
                             .font(.body)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.leading)
                         
                         // App description
                         VStack(alignment: .leading, spacing: 6) {
-                            Label("On‑device debugger", systemImage: "bolt.shield.fill")
+                            Label(NSLocalizedString("On‑device debugger", comment: ""), systemImage: "bolt.shield.fill")
                                 .foregroundColor(accent)
                                 .font(.headline)
-                            Text("StikDebug is an on‑device debugger designed specifically for self‑developed apps. It helps streamline testing and troubleshooting without sending any data to external servers.")
+                            Text(NSLocalizedString("StikDebug is an on‑device debugger designed specifically for self‑developed apps. It helps streamline testing and troubleshooting without sending any data to external servers.", comment: ""))
                                 .font(.callout)
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -64,10 +64,10 @@ struct WelcomeSheetView: View {
                         
                         // VPN explanation
                         VStack(alignment: .leading, spacing: 6) {
-                            Label("Why VPN permission?", systemImage: "lock.shield.fill")
+                            Label(NSLocalizedString("Why VPN permission?", comment: ""), systemImage: "lock.shield.fill")
                                 .foregroundColor(accent)
                                 .font(.headline)
-                            Text("The next step will prompt you to allow VPN permissions. This is necessary for the app to function properly. The VPN configuration allows your device to securely connect to itself — nothing more. No data is collected or sent externally; everything stays on your device.")
+                            Text(NSLocalizedString("The next step will prompt you to allow VPN permissions. This is necessary for the app to function properly. The VPN configuration allows your device to securely connect to itself — nothing more. No data is collected or sent externally; everything stays on your device.", comment: ""))
                                 .font(.callout)
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -75,7 +75,7 @@ struct WelcomeSheetView: View {
                         
                         // Continue button
                         Button(action: { onDismiss?() }) {
-                            Text("Continue")
+                            Text(NSLocalizedString("Continue", comment: ""))
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                                 .foregroundColor(accent.contrastText())
                                 .frame(height: 44)
@@ -107,7 +107,7 @@ struct WelcomeSheetView: View {
                     // Footer version info for consistency
                     HStack {
                         Spacer()
-                        Text("iOS \(UIDevice.current.systemVersion)")
+                        Text(String(format: NSLocalizedString("iOS %@", comment: "Footer version info"), UIDevice.current.systemVersion))
                             .font(.footnote)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -164,6 +164,21 @@ class TunnelManager: ObservableObject {
         case connected = "Connected"
         case disconnecting = "Disconnecting"
         case error = "Error"
+        
+        var localized: String {
+            switch self {
+            case .disconnected:
+                return NSLocalizedString("Disconnected", comment: "VPN tunnel status")
+            case .connecting:
+                return NSLocalizedString("Connecting", comment: "VPN tunnel status")
+            case .connected:
+                return NSLocalizedString("Connected", comment: "VPN tunnel status")
+            case .disconnecting:
+                return NSLocalizedString("Disconnecting", comment: "VPN tunnel status")
+            case .error:
+                return NSLocalizedString("Error", comment: "VPN tunnel status")
+            }
+        }
     }
     
     private init() {
@@ -176,7 +191,7 @@ class TunnelManager: ObservableObject {
             guard let self = self else { return }
             DispatchQueue.main.async {
                 if let error = error {
-                    VPNLogger.shared.log("Error loading preferences: \(error.localizedDescription)")
+                    VPNLogger.shared.log(String(format: NSLocalizedString("Error loading preferences: %@", comment: "Tunnel preferences load failure"), error.localizedDescription))
                     self.tunnelStatus = .error
                     return
                 }
@@ -186,17 +201,17 @@ class TunnelManager: ObservableObject {
                            proto.providerBundleIdentifier == self.tunnelBundleId {
                             self.vpnManager = manager
                             self.updateTunnelStatus(from: manager.connection.status)
-                            VPNLogger.shared.log("Loaded existing tunnel configuration")
+                            VPNLogger.shared.log(NSLocalizedString("Loaded existing tunnel configuration", comment: ""))
                             break
                         }
                     }
                     if self.vpnManager == nil, let firstManager = managers.first {
                         self.vpnManager = firstManager
                         self.updateTunnelStatus(from: firstManager.connection.status)
-                        VPNLogger.shared.log("Using existing tunnel configuration")
+                        VPNLogger.shared.log(NSLocalizedString("Using existing tunnel configuration", comment: ""))
                     }
                 } else {
-                    VPNLogger.shared.log("No existing tunnel configuration found")
+                    VPNLogger.shared.log(NSLocalizedString("No existing tunnel configuration found", comment: ""))
                 }
             }
         }
@@ -224,7 +239,7 @@ class TunnelManager: ObservableObject {
             @unknown default:
                 self.tunnelStatus = .error
             }
-            VPNLogger.shared.log("VPN status updated: \(self.tunnelStatus.rawValue)")
+            VPNLogger.shared.log(String(format: NSLocalizedString("VPN status updated: %@", comment: "VPN connection state change"), self.tunnelStatus.rawValue))
         }
     }
     
@@ -232,7 +247,7 @@ class TunnelManager: ObservableObject {
         NETunnelProviderManager.loadAllFromPreferences { [weak self] (managers, error) in
             guard let self = self else { return completion(false) }
             if let error = error {
-                VPNLogger.shared.log("Error loading preferences: \(error.localizedDescription)")
+                VPNLogger.shared.log(String(format: NSLocalizedString("Error loading preferences: %@", comment: "Tunnel preferences load failure"), error.localizedDescription))
                 return completion(false)
             }
             
@@ -242,20 +257,20 @@ class TunnelManager: ObservableObject {
                     ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == self.tunnelBundleId
                 }) {
                     manager = matchingManager
-                    VPNLogger.shared.log("Updating existing tunnel configuration")
+                    VPNLogger.shared.log(NSLocalizedString("Updating existing tunnel configuration", comment: ""))
                 } else {
                     manager = existingManagers[0]
-                    VPNLogger.shared.log("Using first available tunnel configuration")
+                    VPNLogger.shared.log(NSLocalizedString("Using first available tunnel configuration", comment: ""))
                 }
             } else {
                 manager = NETunnelProviderManager()
-                VPNLogger.shared.log("Creating new tunnel configuration")
+                VPNLogger.shared.log(NSLocalizedString("Creating new tunnel configuration", comment: ""))
             }
             
             manager.localizedDescription = "StikDebug"
             let proto = NETunnelProviderProtocol()
             proto.providerBundleIdentifier = self.tunnelBundleId
-            proto.serverAddress = "StikDebug's Local Network Tunnel"
+            proto.serverAddress = NSLocalizedString("StikDebug's Local Network Tunnel", comment: "")
             manager.protocolConfiguration = proto
             manager.isOnDemandEnabled = true
             manager.isEnabled = true
@@ -264,12 +279,12 @@ class TunnelManager: ObservableObject {
                 guard let self = self else { return completion(false) }
                 DispatchQueue.main.async {
                     if let error = error {
-                        VPNLogger.shared.log("Error saving tunnel configuration: \(error.localizedDescription)")
+                        VPNLogger.shared.log(String(format: NSLocalizedString("Error saving tunnel configuration: %@", comment: "Tunnel save failure"), error.localizedDescription))
                         completion(false)
                         return
                     }
                     self.vpnManager = manager
-                    VPNLogger.shared.log("Tunnel configuration saved successfully")
+                    VPNLogger.shared.log(NSLocalizedString("Tunnel configuration saved successfully", comment: ""))
                     completion(true)
                 }
             }
@@ -294,7 +309,7 @@ class TunnelManager: ObservableObject {
     
     private func startExistingVPN(manager: NETunnelProviderManager) {
         guard tunnelStatus != .connected else {
-            VPNLogger.shared.log("Network tunnel is already connected")
+            VPNLogger.shared.log(NSLocalizedString("Network tunnel is already connected", comment: ""))
             return
         }
         tunnelStatus = .connecting
@@ -305,10 +320,11 @@ class TunnelManager: ObservableObject {
         ]
         do {
             try manager.connection.startVPNTunnel(options: options)
-            VPNLogger.shared.log("Network tunnel start initiated")
+            VPNLogger.shared.log(NSLocalizedString("Network tunnel start initiated", comment: ""))
         } catch {
             tunnelStatus = .error
-            VPNLogger.shared.log("Failed to start tunnel: \(error.localizedDescription)")
+            VPNLogger.shared.log(String(format: NSLocalizedString("Failed to start tunnel: %@", comment: "Start VPN tunnel failure"), error.localizedDescription)
+            )
         }
     }
     
@@ -316,7 +332,7 @@ class TunnelManager: ObservableObject {
         guard let manager = vpnManager else { return }
         tunnelStatus = .disconnecting
         manager.connection.stopVPNTunnel()
-        VPNLogger.shared.log("Network tunnel stop initiated")
+        VPNLogger.shared.log(NSLocalizedString("Network tunnel stop initiated", comment: ""))
     }
 }
 
@@ -341,19 +357,19 @@ func httpGet(_ urlString: String, result: @escaping (String?) -> Void) {
     if let url = URL(string: urlString) {
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
-                print("Error: \(error.localizedDescription)")
+                print(String(format: NSLocalizedString("Error: %@", comment: "General HTTP GET error"), error.localizedDescription))
                 result(nil)
                 return
             }
             
             if let data = data, let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 200 {
-                    print("Response: \(httpResponse.statusCode)")
+                    print(String(format: NSLocalizedString("Response: %d", comment: "HTTP 200 OK status response"), httpResponse.statusCode))
                     if let dataString = String(data: data, encoding: .utf8) {
                         result(dataString)
                     }
                 } else {
-                    print("Received non-200 status code: \(httpResponse.statusCode)")
+                    print(String(format: NSLocalizedString("Received non-200 status code: %d", comment: "HTTP response not OK"), httpResponse.statusCode))
                 }
             }
         }
@@ -409,20 +425,20 @@ class DNSChecker: ObservableObject {
                 
                 group.notify(queue: .main) {
                     if self.controlIP == nil {
-                        self.dnsError = "No internet connection."
-                        print("Control host lookup failed, so no internet connection.")
+                        self.dnsError = NSLocalizedString("No internet connection.", comment: "")
+                        print(NSLocalizedString("Control host lookup failed, so no internet connection.", comment: ""))
                     } else if self.appleIP == nil {
-                        self.dnsError = "Apple DNS blocked. Your network might be filtering Apple traffic."
-                        print("Control lookup succeeded, but Apple lookup failed: likely blocked.")
+                        self.dnsError = NSLocalizedString("Apple DNS blocked. Your network might be filtering Apple traffic.", comment: "")
+                        print(NSLocalizedString("Control lookup succeeded, but Apple lookup failed: likely blocked.", comment: ""))
                     } else {
                         self.dnsError = nil
-                        print("DNS lookups succeeded: Apple -> \(self.appleIP!), Control -> \(self.controlIP!)")
+                        print(String(format: NSLocalizedString("DNS lookups succeeded: Apple -> %@, Control -> %@", comment: "DNS lookup success log"), self.appleIP!, self.controlIP!))
                     }
                 }
             } else {
                 DispatchQueue.main.async {
                     self.dnsError = nil
-                    print("Not connected to WiFi; continuing without DNS check.")
+                    print(NSLocalizedString("Not connected to WiFi; continuing without DNS check.", comment: ""))
                 }
             }
         }
@@ -541,11 +557,11 @@ struct HeartbeatApp: App {
         
         if currentDate > Calendar.current.startOfDay(for: VUA) {
             if UpdateRetrieval() {
-                alert_title = "Update Avaliable!"
+                alert_title = NSLocalizedString("Update Avaliable!", comment: "")
                 let urlString = "https://raw.githubusercontent.com/0-Blu/StikJIT/refs/heads/main/version.txt"
                 httpGet(urlString) { result in
                     if result == nil { return }
-                    alert_string = "Update to: version \(result!)!"
+                    alert_string = String(format: NSLocalizedString("Update to: version %@!", comment: "Prompt to update to a newer app version"), result!)
                     show_alert = true
                 }
             }
@@ -595,7 +611,11 @@ struct HeartbeatApp: App {
                                             isLoading2 = false
                                         }
                                     } else if let vpn_error {
-                                        showAlert(title: "Error", message: "EM Proxy failed to connect: \(vpn_error)", showOk: true) { _ in
+                                        showAlert(
+                                            title: NSLocalizedString("Error", comment: ""),
+                                            message: String(format: NSLocalizedString("EM Proxy failed to connect: %@", comment: "VPN connection failure with reason"), vpn_error),
+                                            showOk: true
+                                        ) { _ in
                                             exit(0)
                                         }
                                     }
@@ -619,34 +639,34 @@ struct HeartbeatApp: App {
                                                 try fileManager.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
                                             }
                                             try fileManager.copyItem(at: url, to: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
-                                            print("File copied successfully!")
+                                            print(NSLocalizedString("File copied successfully!", comment: ""))
                                             startHeartbeatInBackground()
                                         } catch {
-                                            print("Error copying file: \(error)")
+                                            print(String(format: NSLocalizedString("Error copying file: %@", comment: "File copy error in pairing flow"), String(describing: error)))
                                         }
                                     } else {
-                                        print("Source file does not exist.")
+                                        print(NSLocalizedString("Source file does not exist.", comment: ""))
                                     }
                                     
                                     if accessing {
                                         url.stopAccessingSecurityScopedResource()
                                     }
                                 case .failure(_):
-                                    print("Failed")
+                                    print(NSLocalizedString("Failed", comment: ""))
                                 }
                             }
                             .overlay(
                                 ZStack {
                                     if showTimeoutError {
                                         CustomErrorView(
-                                            title: "Connection Error",
-                                            message: "Check your connection and ensure your pairing file is valid and try again.",
+                                            title: NSLocalizedString("Connection Error", comment: ""),
+                                            message: NSLocalizedString("Check your connection and ensure your pairing file is valid and try again.", comment: ""),
                                             onDismiss: {
                                                 showTimeoutError = false
                                             },
                                             showButton: true,
-                                            primaryButtonText: "Continue Anyway",
-                                            secondaryButtonText: "View Logs",
+                                            primaryButtonText: NSLocalizedString("Continue Anyway", comment: ""),
+                                            secondaryButtonText: NSLocalizedString("View Logs", comment: ""),
                                             onPrimaryButtonTap: {
                                                 showContinueWarning = true
                                             },
@@ -659,13 +679,13 @@ struct HeartbeatApp: App {
 
                                     if showContinueWarning {
                                         CustomErrorView(
-                                            title: "Proceeding Without Connection",
-                                            message: "StikDebug will not function as expected if you choose to continue.",
+                                            title: NSLocalizedString("Proceeding Without Connection", comment: ""),
+                                            message: NSLocalizedString("StikDebug will not function as expected if you choose to continue.", comment: ""),
                                             onDismiss: {
                                                 showContinueWarning = false
                                             },
                                             showButton: true,
-                                            primaryButtonText: "I Understand",
+                                            primaryButtonText: NSLocalizedString("I Understand", comment: ""),
                                             onPrimaryButtonTap: {
                                                 showContinueWarning = false
                                                 isLoading2 = false
@@ -688,8 +708,8 @@ struct HeartbeatApp: App {
                                     if !fileManager.fileExists(atPath: destinationURL.path) {
                                         downloadFile(from: urlString, to: destinationURL) { result in
                                             if (result != "") {
-                                                alert_title = "An Error has Occurred"
-                                                alert_string = "[Download DDI Error]: " + result
+                                                alert_title = NSLocalizedString("An Error has Occurred", comment: "")
+                                                alert_string = NSLocalizedString("[Download DDI Error]: ", comment: "") + result
                                                 show_alert = true
                                             }
                                         }
@@ -745,7 +765,7 @@ struct HeartbeatApp: App {
         }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
-                print("App became active – restarting heartbeat")
+                print(NSLocalizedString("App became active – restarting heartbeat", comment: ""))
                 startHeartbeatInBackground()
             }
         }
@@ -762,7 +782,7 @@ struct HeartbeatApp: App {
                 connection?.cancel()
                 DispatchQueue.main.async {
                     if timeoutWorkItem?.isCancelled == false {
-                        callback(false, "[TIMEOUT] The loopback VPN is not connected. Try closing this app, turn it off and back on.")
+                        callback(false, NSLocalizedString("[TIMEOUT] The loopback VPN is not connected. Try closing this app, turn it off and back on.", comment: ""))
                     }
                 }
             }
@@ -781,11 +801,11 @@ struct HeartbeatApp: App {
                 connection?.cancel()
                 DispatchQueue.main.async {
                     if error == NWError.posix(.ETIMEDOUT) {
-                        callback(false, "The loopback VPN is not connected. Try closing the app, turn it off and back on.")
+                        callback(false, NSLocalizedString("The loopback VPN is not connected. Try closing the app, turn it off and back on.", comment: ""))
                     } else if error == NWError.posix(.ECONNREFUSED) {
-                        callback(false, "Wifi is not connected. StikJIT won't work on cellular data.")
+                        callback(false, NSLocalizedString("Wifi is not connected. StikJIT won't work on cellular data.", comment: ""))
                     } else {
-                        callback(false, "em proxy check error: \(error.localizedDescription)")
+                        callback(false, String(format: NSLocalizedString("em proxy check error: %@", comment: "Generic EM proxy failure with error detail"), error.localizedDescription))
                     }
                 }
             default:
@@ -831,7 +851,7 @@ class MountingProgress: ObservableObject {
     
     func progressCallback(progress: size_t, total: size_t, context: UnsafeMutableRawPointer?) {
         let percentage = Double(progress) / Double(total) * 100.0
-        print("Mounting progress: \(percentage)%")
+        print(String(format: NSLocalizedString("Mounting progress: %.1f%%", comment: "Progress percentage while mounting DDI"), percentage))
         DispatchQueue.main.async {
             self.mountProgress = percentage
         }
@@ -1002,7 +1022,7 @@ struct LoadingView: View {
                     }
                 }
                 
-                Text("Loading...")
+                Text(NSLocalizedString("Loading...", comment: ""))
                     .font(.system(size: 20, weight: .medium, design: .rounded))
                     .foregroundColor(.primary)
                     .padding(.top, 20)

@@ -26,7 +26,7 @@ final class StikJITUITestsLaunchTests: XCTestCase {
         // such as logging into a test account or navigating somewhere in the app
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Launch Screen"
+        attachment.name = NSLocalizedString("Launch Screen", comment: "")
         attachment.lifetime = .keepAlways
         add(attachment)
     }

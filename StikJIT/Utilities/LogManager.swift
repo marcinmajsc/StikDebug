@@ -29,8 +29,8 @@ class LogManager: ObservableObject {
     
     private init() {
         // Add initial system info logs
-        addInfoLog("StikJIT starting up")
-        addInfoLog("Initializing environment")
+        addInfoLog(NSLocalizedString("StikJIT starting up", comment: ""))
+        addInfoLog(NSLocalizedString("Initializing environment", comment: ""))
     }
     
     func addLog(message: String, type: LogEntry.LogType) {

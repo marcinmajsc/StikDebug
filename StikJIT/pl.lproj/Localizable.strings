@@ -15,7 +15,7 @@ Kod błędu: %d";
 "Appearance" = "Wygląd";
 "Are you connected to the internet? [Download Failed]" = "Czy masz połączenie z internetem? [Pobieranie nie powiodło się]";
 "Assign Script" = "Przypisz skrypt";
-"Behavior" = "Zachowanie";
+"Behavior" = "Konfiguracja";
 "Cancel" = "Anuluj";
 "Cannot connect to lockdown service" = "Nie można połączyć się z usługą lockdown";
 "Clear" = "Wyczyść";

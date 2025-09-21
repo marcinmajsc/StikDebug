@@ -260,7 +260,7 @@ struct DisplayView: View {
                 .foregroundColor(.primary)
             
             VStack(alignment: .leading, spacing: 6) {
-                Toggle("Load App Icons", isOn: $loadAppIconsOnJIT)
+                Toggle(NSLocalizedString("Load App Icons", comment: ""), isOn: $loadAppIconsOnJIT)
                     .tint(accentColor)
                 
                 Text(NSLocalizedString("Disabling this will hide app icons in the app list and may improve performance, while also giving it a more minimalistic look.", comment: ""))

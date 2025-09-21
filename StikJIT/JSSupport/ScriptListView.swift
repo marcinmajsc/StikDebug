@@ -63,7 +63,7 @@ struct ScriptListView: View {
 
                 if isBusy {
                     Color.black.opacity(0.35).ignoresSafeArea()
-                    ProgressView("Working…")
+                    ProgressView(NSLocalizedString("Working…", comment: ""))
                         .padding(16)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -86,7 +86,7 @@ struct ScriptListView: View {
                 if justCopied {
                     VStack {
                         Spacer()
-                        Text("Copied")
+                        Text(NSLocalizedString("Copied", comment: ""))
                             .font(.footnote.weight(.semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -99,30 +99,30 @@ struct ScriptListView: View {
                     .animation(.easeInOut(duration: 0.25), value: justCopied)
                 }
             }
-            .navigationTitle(isPickerMode ? "Choose Script" : "Scripts")
+            .navigationTitle(isPickerMode ? NSLocalizedString("Choose Script", comment: "") : NSLocalizedString("Scripts", comment: ""))
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if !isPickerMode {
                         Button { showNewFileAlert = true } label: {
-                            Label("New", systemImage: "doc.badge.plus")
+                            Label(NSLocalizedString("New", comment: ""), systemImage: "doc.badge.plus")
                         }
                         Button { showImporter = true } label: {
-                            Label("Import", systemImage: "tray.and.arrow.down")
+                            Label(NSLocalizedString("Import", comment: ""), systemImage: "tray.and.arrow.down")
                         }
                     }
                 }
             }
             .onAppear(perform: loadScripts)
-            .alert("New Script", isPresented: $showNewFileAlert) {
-                TextField("Filename", text: $newFileName)
-                Button("Create", action: createNewScript)
-                Button("Cancel", role: .cancel) { }
+            .alert(NSLocalizedString("New Script", comment: ""), isPresented: $showNewFileAlert) {
+                TextField(NSLocalizedString("Filename", comment: ""), text: $newFileName)
+                Button(NSLocalizedString("Create", comment: ""), action: createNewScript)
+                Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) { }
             }
-            .alert("Delete Script?", isPresented: $showDeleteConfirmation, presenting: pendingDelete) { script in
-                Button("Delete", role: .destructive) { deleteScript(script) }
-                Button("Cancel", role: .cancel) { pendingDelete = nil }
+            .alert(NSLocalizedString("Delete Script?", comment: ""), isPresented: $showDeleteConfirmation, presenting: pendingDelete) { script in
+                Button(NSLocalizedString("Delete", comment: ""), role: .destructive) { deleteScript(script) }
+                Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) { pendingDelete = nil }
             } message: { script in
-                Text("Are you sure you want to delete \(script.lastPathComponent)? This cannot be undone.")
+                Text(String(format: NSLocalizedString("Are you sure you want to delete %@? This cannot be undone.", comment: "Confirm file delete"), script.lastPathComponent))
             }
             .fileImporter(
                 isPresented: $showImporter,
@@ -130,7 +130,7 @@ struct ScriptListView: View {
             ) { result in
                 switch result {
                 case .success(let fileURL): importScript(from: fileURL)
-                case .failure(let error): presentError(title: "Import Failed", message: error.localizedDescription)
+                case .failure(let error): presentError(title: NSLocalizedString("Import Failed", comment: ""), message: error.localizedDescription)
                 }
             }
         }
@@ -140,7 +140,7 @@ struct ScriptListView: View {
 
     private var headerCard: some View {
         VStack(spacing: 12) {
-            TextField("Search scripts…", text: $searchText)
+            TextField(NSLocalizedString("Search scripts…", comment: ""), text: $searchText)
                 .padding(12)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
@@ -150,17 +150,17 @@ struct ScriptListView: View {
 
             HStack(spacing: 12) {
                 if isPickerMode {
-                    WideGlassyButton(title: "None", systemImage: "nosign") {
+                    WideGlassyButton(title: NSLocalizedString("None", comment: ""), systemImage: "nosign") {
                         onSelectScript?(nil)
                     }
-                    WideGlassyButton(title: "Import", systemImage: "tray.and.arrow.down") {
+                    WideGlassyButton(title: NSLocalizedString("Import", comment: ""), systemImage: "tray.and.arrow.down") {
                         showImporter = true
                     }
                 } else {
-                    WideGlassyButton(title: "New", systemImage: "doc.badge.plus") {
+                    WideGlassyButton(title: NSLocalizedString("New", comment: ""), systemImage: "doc.badge.plus") {
                         showNewFileAlert = true
                     }
-                    WideGlassyButton(title: "Import", systemImage: "tray.and.arrow.down") {
+                    WideGlassyButton(title: NSLocalizedString("Import", comment: ""), systemImage: "tray.and.arrow.down") {
                         showImporter = true
                     }
                 }
@@ -223,14 +223,14 @@ struct ScriptListView: View {
         .background(glassyBackground)
         .contextMenu {
             Button { copyName(script) } label: {
-                Label("Copy Filename", systemImage: "doc.on.doc")
+                Label(NSLocalizedString("Copy Filename", comment: ""), systemImage: "doc.on.doc")
             }
             Button { copyPath(script) } label: {
-                Label("Copy Path", systemImage: "folder")
+                Label(NSLocalizedString("Copy Path", comment: ""), systemImage: "folder")
             }
             if !isPickerMode {
                 Button { saveDefaultScript(script) } label: {
-                    Label("Set Default", systemImage: "star")
+                    Label(NSLocalizedString("Set Default", comment: ""), systemImage: "star")
                 }
             }
         }
@@ -238,10 +238,10 @@ struct ScriptListView: View {
 
     private var emptyCard: some View {
         VStack(spacing: 6) {
-            Label(isPickerMode ? "No scripts available" : "No scripts found",
+            Label(isPickerMode ? NSLocalizedString("No scripts available", comment: "") : NSLocalizedString("No scripts found", comment: ""),
                   systemImage: "doc.text.magnifyingglass")
                 .font(.subheadline.weight(.semibold))
-            Text(isPickerMode ? "Import a file or choose None." : "Tap New or Import to get started.")
+            Text(isPickerMode ? NSLocalizedString("Import a file or choose None.", comment: "") : NSLocalizedString("Tap New or Import to get started.", comment: ""))
                 .font(.footnote)
                 .foregroundColor(.secondary)
         }
@@ -281,7 +281,7 @@ struct ScriptListView: View {
                 }
             }
         } catch {
-            presentError(title: "Unable to Create Scripts Folder", message: error.localizedDescription)
+            presentError(title: NSLocalizedString("Unable to Create Scripts Folder", comment: ""), message: error.localizedDescription)
         }
         return dir
     }
@@ -295,7 +295,7 @@ struct ScriptListView: View {
 
     private func saveDefaultScript(_ url: URL) {
         defaultScriptName = url.lastPathComponent
-        presentSuccess(title: "Default Script Set", message: url.lastPathComponent)
+        presentSuccess(title: NSLocalizedString("Default Script Set", comment: ""), message: url.lastPathComponent)
     }
 
     private func createNewScript() {
@@ -304,16 +304,16 @@ struct ScriptListView: View {
         if !filename.hasSuffix(".js") { filename += ".js" }
         let newURL = scriptsDirectory().appendingPathComponent(filename)
         guard !FileManager.default.fileExists(atPath: newURL.path) else {
-            presentError(title: "Failed to Create New Script", message: "A script with the same name already exists.")
+            presentError(title: NSLocalizedString("Failed to Create New Script", comment: ""), message: NSLocalizedString("A script with the same name already exists.", comment: ""))
             return
         }
         do {
             try "".write(to: newURL, atomically: true, encoding: .utf8)
             newFileName = ""
             loadScripts()
-            presentSuccess(title: "Created", message: filename)
+            presentSuccess(title: NSLocalizedString("Created", comment: ""), message: filename)
         } catch {
-            presentError(title: "Error Creating File", message: error.localizedDescription)
+            presentError(title: NSLocalizedString("Error Creating File", comment: ""), message: error.localizedDescription)
         }
     }
 
@@ -325,7 +325,7 @@ struct ScriptListView: View {
             }
             loadScripts()
         } catch {
-            presentError(title: "Delete Failed", message: error.localizedDescription)
+            presentError(title: NSLocalizedString("Delete Failed", comment: ""), message: error.localizedDescription)
         }
     }
 
@@ -341,11 +341,11 @@ struct ScriptListView: View {
                 try FileManager.default.copyItem(at: fileURL, to: dest)
                 DispatchQueue.main.async {
                     self.loadScripts()
-                    self.presentSuccess(title: "Imported", message: fileURL.lastPathComponent)
+                    self.presentSuccess(title: NSLocalizedString("Imported", comment: ""), message: fileURL.lastPathComponent)
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.presentError(title: "Import Failed", message: error.localizedDescription)
+                    self.presentError(title: NSLocalizedString("Import Failed", comment: ""), message: error.localizedDescription)
                 }
             }
         }

@@ -16,8 +16,8 @@ struct AppsWidget: Widget {
         StaticConfiguration(kind: kind, provider: AppsProvider()) { entry in
             AppsWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("StikDebug Favorites")
-        .description("Quick-launch your top 4 favorite debug targets.")
+        .configurationDisplayName(NSLocalizedString("StikDebug Favorites", comment: ""))
+        .description(NSLocalizedString("Quick-launch your top 4 favorite debug targets.", comment: ""))
         .supportedFamilies([.systemMedium])
     }
 }

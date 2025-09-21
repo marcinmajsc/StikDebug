@@ -20,7 +20,7 @@ func progressCallback(progress: size_t, total: size_t, context: UnsafeMutableRaw
 
 func readFile(path: String) -> Data? {
     guard let file = fopen(path, "rb") else {
-        perror("Failed to open file")
+        perror(NSLocalizedString("Failed to open file", comment: ""))
         return nil
     }
     
@@ -56,7 +56,7 @@ func isMounted() -> Bool {
     let pairingFilePath = URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path
     
     guard inet_pton(AF_INET, "10.7.0.1", &addr.sin_addr) == 1 else {
-        print("Invalid IP address")
+        print(NSLocalizedString("Invalid IP address", comment: ""))
         return false
     }
 
@@ -64,7 +64,7 @@ func isMounted() -> Bool {
     var pairingFile: IdevicePairingFile?
     let err = idevice_pairing_file_read(pairingFilePath, &pairingFile)
     if let err {
-        print("Failed to read pairing file: \(err)")
+        print(String(format: NSLocalizedString("Failed to read pairing file: %@", comment: "Pairing file read failure"), String(describing: err)))
         return false
     }
 
@@ -72,7 +72,7 @@ func isMounted() -> Bool {
     var provider: TcpProviderHandle?
     let providerError = idevice_tcp_provider_new(sockaddrPointer, pairingFile, "ImageMounterTest", &provider)
     if let providerError {
-        print("Failed to create TCP provider: \(providerError)")
+        print(String(format: NSLocalizedString("Failed to create TCP provider: %@", comment: "TCP provider creation failure"), String(describing: providerError)))
         return false
     }
 
@@ -80,7 +80,7 @@ func isMounted() -> Bool {
     var client: ImageMounterHandle?
     let connectError = image_mounter_connect(provider, &client)
     if let connectError {
-        print("Failed to connect to image mounter: \(connectError)")
+        print(String(format: NSLocalizedString("Failed to connect to image mounter: %@", comment: "Image mounter connect failure"), String(describing: connectError)))
         return false
     }
     idevice_provider_free(provider)
@@ -108,7 +108,7 @@ func isMounted() -> Bool {
         image_mounter_free(client)
         return devices.count != 0
     } else {
-        print("Failed to get device list: \(listError)")
+        print(String(format: NSLocalizedString("Failed to get device list: %@", comment: "Device list retrieval failure"), String(describing: listError)))
         return false
     }
 }
@@ -116,12 +116,12 @@ func isMounted() -> Bool {
 func mountPersonalDDI(deviceIP: String = "10.7.0.1", imagePath: String, trustcachePath: String, manifestPath: String, pairingFilePath: String) -> Int {
     idevice_init_logger(Debug, Disabled, nil)
     
-    print("Mounting \(imagePath) \(trustcachePath) \(manifestPath)")
+    print(String(format: NSLocalizedString("Mounting %@ %@ %@", comment: "Mounting image, trustcache, manifest paths"), imagePath, trustcachePath, manifestPath))
     
     guard let image = readFile(path: imagePath),
           let trustcache = readFile(path: trustcachePath),
           let buildManifest = readFile(path: manifestPath) else {
-        print("Failed to read one or more files")
+        print(NSLocalizedString("Failed to read one or more files", comment: ""))
         return 1 // EC: 1
     }
     
@@ -132,14 +132,14 @@ func mountPersonalDDI(deviceIP: String = "10.7.0.1", imagePath: String, trustcac
     let sockaddrPointer = UnsafeRawPointer(&addr).bindMemory(to: sockaddr.self, capacity: 1)
     
     guard inet_pton(AF_INET, deviceIP, &addr.sin_addr) == 1 else {
-        print("Invalid IP address")
+        print(NSLocalizedString("Invalid IP address", comment: ""))
         return 2 // EC: 2
     }
 
     var pairingFile: IdevicePairingFile?
     let err = idevice_pairing_file_read(pairingFilePath.cString(using: .utf8), &pairingFile)
     if let err {
-        print("Failed to read pairing file: \(err.pointee.code)")
+        print(String(format: NSLocalizedString("Failed to read pairing file: %d", comment: "Pairing file read failure code"), err.pointee.code))
         return 3 // EC: 3
     }
 
@@ -147,7 +147,7 @@ func mountPersonalDDI(deviceIP: String = "10.7.0.1", imagePath: String, trustcac
     var provider: TcpProviderHandle?
     let providerError = idevice_tcp_provider_new(sockaddrPointer, pairingFile, "ImageMounterTest".cString(using: .utf8), &provider)
     if let providerError {
-        print("Failed to create TCP provider: \(providerError)")
+        print(String(format: NSLocalizedString("Failed to create TCP provider: %@", comment: "TCP provider creation failure"), String(describing: providerError)))
         return 4 // EC: 4
     }
     
@@ -155,24 +155,24 @@ func mountPersonalDDI(deviceIP: String = "10.7.0.1", imagePath: String, trustcac
     var pairingFile2: IdevicePairingFile?
     let P2err = idevice_pairing_file_read(pairingFilePath.cString(using: .utf8), &pairingFile2)
     if let P2err {
-        print("Failed to read pairing file: \(P2err.pointee.code)")
+        print(String(format: NSLocalizedString("Failed to read pairing file: %d", comment: "Pairing file read failure code"), P2err.pointee.code))
         return 5 // EC: 5
     }
     
     var lockdownClient: LockdowndClientHandle?
     if let err = lockdownd_connect(provider, &lockdownClient) {
-        print("Failed to connect to lockdownd")
+        print(NSLocalizedString("Failed to connect to lockdownd", comment: ""))
         return 6 // EC: 6
     }
     
     if let err = lockdownd_start_session(lockdownClient, pairingFile2) {
-        print("Failed to start session")
+        print(NSLocalizedString("Failed to start session", comment: ""))
         return 7 // EC: 7
     }
     
     var uniqueChipIDPlist: plist_t?
     if let err = lockdownd_get_value(lockdownClient, "UniqueChipID".cString(using: .utf8), nil, &uniqueChipIDPlist) {
-        print("Failed to get UniqueChipID")
+        print(NSLocalizedString("Failed to get UniqueChipID", comment: ""))
         return 8 // EC: 8
     }
     
@@ -184,7 +184,7 @@ func mountPersonalDDI(deviceIP: String = "10.7.0.1", imagePath: String, trustcac
     
     var mounterClient: ImageMounterHandle?
     if let err = image_mounter_connect(provider, &mounterClient) {
-        print("Failed to connect to image mounter")
+        print(NSLocalizedString("Failed to connect to image mounter", comment: ""))
         return 9 // EC: 9
     }
     

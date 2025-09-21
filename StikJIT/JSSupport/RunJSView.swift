@@ -29,7 +29,7 @@ class RunJSViewModel: ObservableObject {
     
     func runScript(data: Data, name: String? = nil) throws {
         let scriptContent = String(data: data, encoding: .utf8)
-        scriptName = name ?? "Script"
+        scriptName = name ?? NSLocalizedString("Script", comment: "")
         
         let getPidFunction: @convention(block) () -> Int = {
             return self.pid
@@ -37,11 +37,11 @@ class RunJSViewModel: ObservableObject {
         
         let sendCommandFunction: @convention(block) (String?) -> String? = { commandStr in
             guard let commandStr else {
-                self.context?.exception = JSValue(object: "Command should not be nil.", in: self.context!)
+                self.context?.exception = JSValue(object: NSLocalizedString("Command should not be nil.", comment: ""), in: self.context!)
                 return ""
             }
             if self.executionInterrupted {
-                self.context?.exception = JSValue(object: "Script execution is interrupted by StikDebug.", in: self.context!)
+                self.context?.exception = JSValue(object: NSLocalizedString("Script execution is interrupted by StikDebug.", comment: ""), in: self.context!)
                 return ""
             }
             
@@ -79,8 +79,8 @@ class RunJSViewModel: ObservableObject {
                 self.logs.append(exception.debugDescription)
             }
             
-            self.logs.append("Script Execution Completed")
-            self.logs.append("You are safe to close the PIP Window.")
+            self.logs.append(NSLocalizedString("Script Execution Completed", comment: ""))
+            self.logs.append(NSLocalizedString("You are safe to close the PIP Window.", comment: ""))
         }
     }
 }
@@ -119,7 +119,7 @@ struct RunJSView: View {
                         .id(index)
                 }
             }
-            .navigationTitle("Running \(model.scriptName)")
+            .navigationTitle(String(format: NSLocalizedString("Running %@", comment: "Navigation title for running script"), model.scriptName))
             .onChange(of: model.logs.count) { newCount in
                 guard newCount > 0 else { return }
                 withAnimation {
