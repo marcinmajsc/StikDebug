@@ -8,7 +8,6 @@
 "Connect by PID" = "Połącz według PID";
 "Open Console" = "Otwórz konsolę";
 "Processing pairing file..." = "Przetwarzanie pliku parowania...";
-"\u2713 Pairing file successfully imported" = "\u2713 Plik parowania został pomyślnie zaimportowany";
 "Please enter the PID of the process you want to connect to" = "Wprowadź PID procesu, z którym chcesz się połączyć";
 "Invalid PID" = "Nieprawidłowy PID";
 "Success" = "Sukces";
@@ -46,12 +45,6 @@
 "Error copying file" = "Błąd podczas kopiowania pliku";
 "Failed to import file" = "Nie udało się zaimportować pliku";
 "Done" = "Gotowe";
-"Connect by App" = "Połącz według aplikacji";
-"Select Pairing File" = "Wybierz plik parowania";
-"Connect by PID" = "Połącz według PID";
-"Processing pairing file…" = "Przetwarzanie pliku parowania…";
-"Pairing file successfully imported" = "Plik parowania został pomyślnie zaimportowany";
-"Open Console" = "Otwórz konsolę";
 "Tips" = "Wskazówki";
 "Pairing file required" = "Wymagany plik parowania";
 "Import your device’s pairing file to begin." = "Zaimportuj plik parowania swojego urządzenia, aby rozpocząć.";
@@ -70,5 +63,4 @@
 "Clear" = "Wyczyść";
 "Remove" = "Usuń";
 "Connect" = "Połącz";
-"Connect by PID" = "Połącz według PID";
 "Please enter a positive number." = "Wprowadź liczbę dodatnią.";

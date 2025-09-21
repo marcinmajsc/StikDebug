@@ -8,7 +8,6 @@
 "Connect by PID" = "Connect by PID";
 "Open Console" = "Open Console";
 "Processing pairing file..." = "Processing pairing file...";
-"\u2713 Pairing file successfully imported" = "\u2713 Pairing file successfully imported";
 "Please enter the PID of the process you want to connect to" = "Please enter the PID of the process you want to connect to";
 "Invalid PID" = "Invalid PID";
 "Success" = "Success";
@@ -46,12 +45,6 @@
 "Error copying file" = "Error copying file";
 "Failed to import file" = "Failed to import file";
 "Done" = "Done";
-"Connect by App" = "Connect by App";
-"Select Pairing File" = "Select Pairing File";
-"Connect by PID" = "Connect by PID";
-"Processing pairing file…" = "Processing pairing file…";
-"Pairing file successfully imported" = "Pairing file successfully imported";
-"Open Console" = "Open Console";
 "Tips" = "Tips";
 "Pairing file required" = "Pairing file required";
 "Import your device’s pairing file to begin." = "Import your device’s pairing file to begin.";
@@ -70,5 +63,4 @@
 "Clear" = "Clear";
 "Remove" = "Remove";
 "Connect" = "Connect";
-"Connect by PID" = "Connect by PID";
 "Please enter a positive number." = "Please enter a positive number.";
