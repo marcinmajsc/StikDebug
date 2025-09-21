@@ -17,8 +17,6 @@ private func registerAdvancedOptionsDefault() {
     let enabled = os.majorVersion >= 19
     UserDefaults.standard.register(defaults: ["enableAdvancedOptions": enabled])
     UserDefaults.standard.register(defaults: ["enablePiP": enabled])
-    // New default: VPN auto start enabled
-    UserDefaults.standard.register(defaults: ["vpnAutoStart": true])
 }
 
 // MARK: - Welcome Sheet
@@ -489,7 +487,6 @@ struct HeartbeatApp: App {
     @AppStorage("hasLaunchedBefore") var hasLaunchedBefore: Bool = false
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
-    @AppStorage("vpnAutoStart") private var vpnAutoStart: Bool = true
     @State private var showWelcomeSheet: Bool = false
     @State private var isLoading2 = true
     @State private var isPairing = false
@@ -720,10 +717,10 @@ struct HeartbeatApp: App {
                 .tint(globalAccent)
                 .onAppear {
                     // On first launch, present the welcome sheet.
-                    // Otherwise, start the VPN automatically (if enabled).
+                    // Otherwise, start the VPN automatically.
                     if !hasLaunchedBefore {
                         showWelcomeSheet = true
-                    } else if vpnAutoStart {
+                    } else {
                         TunnelManager.shared.startVPN()
                     }
                     // Update UIKit tint now and subscribe to changes without capturing self
@@ -738,12 +735,10 @@ struct HeartbeatApp: App {
                 }
                 .sheet(isPresented: $showWelcomeSheet) {
                     WelcomeSheetView {
-                        // When the user taps "Continue", mark the app as launched and start the VPN (if enabled).
+                        // When the user taps "Continue", mark the app as launched and start the VPN.
                         hasLaunchedBefore = true
                         showWelcomeSheet = false
-                        if vpnAutoStart {
-                            TunnelManager.shared.startVPN()
-                        }
+                        TunnelManager.shared.startVPN()
                     }
                 }
             }

@@ -41,7 +41,7 @@ struct HomeView: View {
     
     @State private var viewDidAppeared = false
     @State private var pendingJITEnableConfiguration : JITEnableConfiguration? = nil
-    @AppStorage("enableAdvancedOptions") private var enableAdvancedOptions = true
+    @AppStorage("enableAdvancedOptions") private var enableAdvancedOptions = false
 
     @AppStorage("useDefaultScript") private var useDefaultScript = false
     @AppStorage("enablePiP") private var enablePiP = true
@@ -50,9 +50,7 @@ struct HomeView: View {
     @AppStorage("DefaultScriptName") var selectedScript = "attachDetach.js"
     @State var jsModel: RunJSViewModel?
     
-    // New: allow overriding TXM requirement for scripts
-    @AppStorage("ignoreTXMForScripts") private var ignoreTXMForScripts = false
-    
+    @StateObject private var tunnel = TunnelManager.shared
     @State private var heartbeatOK = false
 
     @AppStorage("showiOS26Disclaimer") private var showiOS26Disclaimer: Bool = true
@@ -72,11 +70,7 @@ struct HomeView: View {
         let v = ProcessInfo.processInfo.operatingSystemVersion
         return v.majorVersion >= 26
     }
-    private var isDismissibleDisclaimer: Bool { !isOnOrAfteriOS26 }
-    
-    // Observe VPN status
-    @StateObject private var tunnelManager = TunnelManager.shared
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -87,7 +81,7 @@ struct HomeView: View {
                     VStack(spacing: 20) {
                         if isOnOrAfteriOS26 || showiOS26Disclaimer {
                             disclaimerCard
-                                .transition(.opacity .combined(with: .move(edge: .top)))
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                         }
 
                         topStatusAndActionsCard
@@ -136,22 +130,99 @@ struct HomeView: View {
             checkPairingFileExists()
             heartbeatOK = pubHeartBeat
         }
-        .fileImporter(
-            isPresented: $isShowingPairingFilePicker,
-            allowedContentTypes: [
-                UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data)!,
-                .propertyList
-            ]
-        ) { result in
-            if case .success(let url) = result {
-                importPairingFile(from: url)
-            } else if case .failure(let error) = result {
+        .fileImporter(isPresented: $isShowingPairingFilePicker, allowedContentTypes: [UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data)!, .propertyList]) { result in
+            switch result {
+            case .success(let url):
+                let fileManager = FileManager.default
+                let accessing = url.startAccessingSecurityScopedResource()
+                
+                if fileManager.fileExists(atPath: url.path) {
+                    do {
+                        let dest = URL.documentsDirectory.appendingPathComponent("pairingFile.plist")
+                        if FileManager.default.fileExists(atPath: dest.path) {
+                            try fileManager.removeItem(at: dest)
+                        }
+                        try fileManager.copyItem(at: url, to: dest)
+                        
+                        DispatchQueue.main.async {
+                            isImportingFile = true
+                            importProgress = 0
+                            pairingFileExists = true
+                        }
+                        
+                        startHeartbeatInBackground()
+                        
+                        let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { t in
+                            DispatchQueue.main.async {
+                                if importProgress < 1 {
+                                    importProgress += 0.25
+                                } else {
+                                    t.invalidate()
+                                    isImportingFile = false
+                                    pairingFileIsValid = true
+                                    withAnimation { showPairingFileMessage = true }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                        withAnimation { showPairingFileMessage = false }
+                                    }
+                                }
+                            }
+                        }
+                        RunLoop.current.add(progressTimer, forMode: .common)
+                    } catch {
+                        print("Error copying file: \(error)")
+                    }
+                }
+                if accessing { url.stopAccessingSecurityScopedResource() }
+            case .failure(let error):
                 print("Failed to import file: \(error)")
             }
         }
         .sheet(isPresented: $isShowingInstalledApps) {
             InstalledAppsListView { selectedBundle in
-                handleAppSelection(selectedBundle)
+                bundleID = selectedBundle
+                isShowingInstalledApps = false
+                HapticFeedbackHelper.trigger()
+                
+                var autoScriptData: Data? = nil
+                var autoScriptName: String? = nil
+                
+                let appName: String? = (try? JITEnableContext.shared.getAppList()[selectedBundle])
+                
+                if #available(iOS 26, *) {
+                    if ProcessInfo.processInfo.hasTXM, let appName {
+                        if appName == "maciOS" {
+                            if let url = Bundle.main.url(forResource: "script1", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "script1.js"
+                            }
+                        } else if appName == "Amethyst" {
+                            if let url = Bundle.main.url(forResource: "script2", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "script2.js"
+                            }
+                        } else if appName == "MeloNX" {
+                            if let url = Bundle.main.url(forResource: "melo", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "melo.js"
+                            }
+                        } else if appName == "UTM" {
+                            if let url = Bundle.main.url(forResource: "utmjit", withExtension: "js"),
+                               let data = try? Data(contentsOf: url) {
+                                autoScriptData = data
+                                autoScriptName = "utmjit.js"
+                            }
+                        }
+                    }
+                }
+                
+                startJITInBackground(bundleID: selectedBundle,
+                                     pid: nil,
+                                     scriptData: autoScriptData,
+                                     scriptName: autoScriptName,
+                                     triggeredByURLScheme: false)
             }
         }
         .pipify(isPresented: Binding(
@@ -225,7 +296,7 @@ struct HomeView: View {
             HStack(spacing: 12) {
                 indicatorCapsule(ok: pairingFileExists, systemImage: "doc.badge.plus", a11y: "Pairing")
                 indicatorCapsule(ok: ddiMounted, systemImage: "externaldrive", a11y: "Developer Disk Image")
-                indicatorCapsule(ok: tunnelManager.tunnelStatus == .connected, systemImage: "lock.shield", a11y: "VPN")
+                indicatorCapsule(ok: tunnel.tunnelStatus == .connected, systemImage: "lock.shield", a11y: "VPN")
                 indicatorCapsule(ok: heartbeatOK, systemImage: "waveform.path.ecg", a11y: "Heartbeat")
                 Spacer()
             }
@@ -332,8 +403,6 @@ struct HomeView: View {
     private var toolsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Tools").font(.headline).foregroundColor(.secondary)
-            
-            // Console
             Button(action: { showingConsoleLogsView = true }) {
                 HStack {
                     Image(systemName: "terminal").font(.system(size: 20))
@@ -488,19 +557,54 @@ struct HomeView: View {
         LogManager.shared.addInfoLog("Starting Debug for \(bundleID ?? String(pid ?? 0))")
         
         DispatchQueue.global(qos: .background).async {
-            // …existing script selection logic…
-
+            var scriptData = scriptData
+            var scriptName = scriptName
+            if enableAdvancedOptions && scriptData == nil {
+                if scriptName == nil, let bundleID, let mapping = UserDefaults.standard.dictionary(forKey: "BundleScriptMap") as? [String: String] {
+                    scriptName = mapping[bundleID]
+                }
+                if useDefaultScript && scriptName == nil { scriptName = selectedScript }
+                if scriptData == nil, let scriptName {
+                    let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                        .appendingPathComponent("scripts").appendingPathComponent(scriptName)
+                    if FileManager.default.fileExists(atPath: url.path) {
+                        do { scriptData = try Data(contentsOf: url) } catch { print("script load error: \(error)") }
+                    }
+                }
+            } else {
+                // keep passed-in auto script if provided; otherwise nil
+            }
+            
             var callback: DebugAppCallback? = nil
-            // Allow script if TXM is present OR user chose to ignore TXM requirement
-            if (ProcessInfo.processInfo.hasTXM || ignoreTXMForScripts), let sd = scriptData {
+            if ProcessInfo.processInfo.hasTXM, let sd = scriptData {
                 callback = getJsCallback(sd, name: scriptName ?? bundleID ?? "Script")
                 if triggeredByURLScheme { usleep(500000) }
                 pipRequired = true
             } else {
                 pipRequired = false
             }
-
-            // …rest unchanged…
+            
+            let logger: LogFunc = { message in if let message { LogManager.shared.addInfoLog(message) } }
+            var success: Bool
+            if let pid {
+                success = JITEnableContext.shared.debugApp(withPID: Int32(pid), logger: logger, jsCallback: callback)
+                if success { DispatchQueue.main.async { addRecentPID(pid) } }
+            } else if let bundleID {
+                success = JITEnableContext.shared.debugApp(withBundleID: bundleID, logger: logger, jsCallback: callback)
+            } else {
+                DispatchQueue.main.async {
+                    showAlert(title: "Failed to Debug App".localized, message: "Either bundle ID or PID should be specified.".localized, showOk: true)
+                }
+                success = false
+            }
+            
+            if success {
+                DispatchQueue.main.async {
+                    LogManager.shared.addInfoLog("Debug process completed for \(bundleID ?? String(pid ?? 0))")
+                }
+            }
+            isProcessing = false
+            pipRequired = false
         }
     }
     
@@ -537,7 +641,7 @@ struct HomeView: View {
             }
             Spacer()
             
-            if isDismissibleDisclaimer {
+            if !isOnOrAfteriOS26 {
                 Button {
                     withAnimation {
                         showiOS26Disclaimer = false
@@ -566,94 +670,6 @@ struct HomeView: View {
         .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing.")
-    }
-    
-    // MARK: - Helpers extracted to avoid heavy type-check
-    
-    private func importPairingFile(from url: URL) {
-        let fileManager = FileManager.default
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        
-        guard fileManager.fileExists(atPath: url.path) else { return }
-        do {
-            let dest = URL.documentsDirectory.appendingPathComponent("pairingFile.plist")
-            if fileManager.fileExists(atPath: dest.path) {
-                try fileManager.removeItem(at: dest)
-            }
-            try fileManager.copyItem(at: url, to: dest)
-            
-            DispatchQueue.main.async {
-                isImportingFile = true
-                importProgress = 0
-                pairingFileExists = true
-            }
-            
-            startHeartbeatInBackground()
-            
-            let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { t in
-                DispatchQueue.main.async {
-                    if importProgress < 1 {
-                        importProgress += 0.25
-                    } else {
-                        t.invalidate()
-                        isImportingFile = false
-                        pairingFileIsValid = true
-                        withAnimation { showPairingFileMessage = true }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            withAnimation { showPairingFileMessage = false }
-                        }
-                    }
-                }
-            }
-            RunLoop.current.add(progressTimer, forMode: .common)
-        } catch {
-            print("Error copying file: \(error)")
-        }
-    }
-    
-    private func handleAppSelection(_ selectedBundle: String) {
-        bundleID = selectedBundle
-        isShowingInstalledApps = false
-        HapticFeedbackHelper.trigger()
-        
-        let auto = computeAutoScript(for: selectedBundle)
-        startJITInBackground(bundleID: selectedBundle,
-                             pid: nil,
-                             scriptData: auto.data,
-                             scriptName: auto.name,
-                             triggeredByURLScheme: false)
-    }
-    
-    private func computeAutoScript(for bundleID: String) -> (data: Data?, name: String?) {
-        var autoScriptData: Data? = nil
-        var autoScriptName: String? = nil
-        
-        let appName: String? = (try? JITEnableContext.shared.getAppList()[bundleID])
-        if #available(iOS 26, *) {
-            if ProcessInfo.processInfo.hasTXM, let appName {
-                func loadScript(resource: String, name: String) {
-                    if let url = Bundle.main.url(forResource: resource, withExtension: "js"),
-                       let data = try? Data(contentsOf: url) {
-                        autoScriptData = data
-                        autoScriptName = name
-                    }
-                }
-                switch appName {
-                case "maciOS":
-                    loadScript(resource: "script1", name: "script1.js")
-                case "Amethyst":
-                    loadScript(resource: "script2", name: "script2.js")
-                case "MeloNX":
-                    loadScript(resource: "melo", name: "melo.js")
-                case "UTM", "DolphiniOS":
-                    loadScript(resource: "utmjit", name: "utmjit.js")
-                default:
-                    break
-                }
-            }
-        }
-        return (autoScriptData, autoScriptName)
     }
 }
 
@@ -890,4 +906,3 @@ public extension ProcessInfo {
         }()
     }
 }
-
