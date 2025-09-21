@@ -726,7 +726,7 @@ struct HeartbeatApp: App {
                                                 show_alert = false
                                             },
                                             showButton: true,
-                                            primaryButtonText: "OK"
+                                            primaryButtonText: NSLocalizedString("OK", comment: "")
                                         )
                                     }
                                 }
@@ -1022,7 +1022,7 @@ struct LoadingView: View {
                     }
                 }
                 
-                Text(NSLocalizedString("Loading...", comment: ""))
+                Text(NSLocalizedString("Loading…", comment: ""))
                     .font(.system(size: 20, weight: .medium, design: .rounded))
                     .foregroundColor(.primary)
                     .padding(.top, 20)
@@ -1069,7 +1069,7 @@ public func showAlert(title: String, message: String, showOk: Bool, showTryAgain
                     completion?(true)
                 },
                 showButton: true,
-                primaryButtonText: primaryButtonText ?? "OK",
+                primaryButtonText: primaryButtonText ?? NSLocalizedString("OK", comment: ""),
                 onPrimaryButtonTap: {
                     rootViewController?.presentedViewController?.dismiss(animated: true)
                     completion?(true)
