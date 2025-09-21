@@ -34,4 +34,9 @@
 
 "Tools" = "Narzędzia";
 "Home" = "Strona Główna";
-"Welcome" = "Witaj";
+"Welcome" = "Witamy, %@";
+"Select an app to start debugging." = "Wybierz aplikację, aby rozpocząć debugowanie.";
+"Mount the Developer Disk Image in Settings." = "Zamontuj obraz dysku deweloperskiego w Ustawieniach";
+"Import your pairing file to get started." = "Aby rozpocząć zaimportuj plik parowania";
+"Important for iOS 26+" = "Ważne dla iOS 26+";
+"Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time." = "Ograniczona kompatybilność z iOS 26 i nowszym. Niektóre aplikacje mogą jeszcze nie działać zgodnie z oczekiwaniami. Aktywnie poprawiamy wsparcie.";

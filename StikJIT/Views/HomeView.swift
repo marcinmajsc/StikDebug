@@ -301,7 +301,7 @@ struct HomeView: View {
                 Spacer()
             }
             VStack(spacing: 4) {
-                Text("Welcome, \(username)")
+                Text(String(format: NSLocalizedString("Welcome", comment: ""), username))
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -495,9 +495,9 @@ struct HomeView: View {
     }
     
     private func helperSubtitle() -> String {
-        if canConnectByApp { return "Select an app to start debugging." }
-        if pairingFileExists { return "Mount the Developer Disk Image in Settings." }
-        return "Import your pairing file to get started."
+        if canConnectByApp { return NSLocalizedString("Select an app to start debugging.", comment: "") }
+        if pairingFileExists { return NSLocalizedString("Mount the Developer Disk Image in Settings.", comment: "") }
+        return NSLocalizedString("Import your pairing file to get started.", comment: "")
     }
     
     private func primaryActionTapped() {
@@ -631,10 +631,10 @@ struct HomeView: View {
                 .imageScale(.large)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Important for iOS 26+")
+                Text(NSLocalizedString("Important for iOS 26+", comment: ""))
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.primary)
-                Text("Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time.")
+                Text(NSLocalizedString("Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time.", comment: ""))
                     .font(.footnote)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
