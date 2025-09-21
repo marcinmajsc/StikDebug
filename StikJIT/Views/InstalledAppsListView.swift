@@ -56,7 +56,7 @@ struct InstalledAppsListView: View {
                 if showPerformanceToast {
                     VStack {
                         Spacer()
-                        Text(performanceMode ? "Performance Mode On" : "Performance Mode Off")
+                        Text(performanceMode ? NSLocalizedString("Performance Mode On", comment: "") : NSLocalizedString("Performance Mode Off", comment: ""))
                             .font(.subheadline.weight(.semibold))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
@@ -68,7 +68,7 @@ struct InstalledAppsListView: View {
                     .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showPerformanceToast)
                 }
             }
-            .navigationTitle("Installed Apps".localized)
+            .navigationTitle(NSLocalizedString("Installed Apps", comment: ""))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -84,13 +84,13 @@ struct InstalledAppsListView: View {
                         Image(systemName: performanceMode ? "bolt.fill" : "bolt.slash.fill")
                             .imageScale(.large)
                             .foregroundStyle(performanceMode ? .yellow : .secondary)
-                            .accessibilityLabel("Toggle Performance Mode")
-                            .accessibilityValue(performanceMode ? "On" : "Off")
+                            .accessibilityLabel(NSLocalizedString("Toggle Performance Mode", comment: ""))
+                            .accessibilityValue(performanceMode ? NSLocalizedString("On", comment: "") : NSLocalizedString("Off", comment: ""))
                     }
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(NSLocalizedString("Done", comment: "")) { dismiss() }
                         .fontWeight(.semibold)
                 }
             }
@@ -107,14 +107,14 @@ struct InstalledAppsListView: View {
                 .frame(width: 60, height: 60)
                 .foregroundStyle(.secondary)
 
-            Text("No Debuggable App Found")
+            Text(NSLocalizedString("No Debuggable App Found", comment: ""))
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            Text("""
+            Text(NSLocalizedString("""
             StikDebug can only connect to apps with the “get-task-allow” entitlement.
             Please check if the app you want to connect to is signed with a development certificate.
-            """)
+            """, comment: ""))
             .font(.body)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
@@ -123,7 +123,7 @@ struct InstalledAppsListView: View {
         .padding(24)
         .glassCard(cornerRadius: 24, material: .thinMaterial, strokeOpacity: 0.12)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("No debuggable app found. Ensure the app is signed for development.")
+        .accessibilityLabel(NSLocalizedString("No debuggable app found. Ensure the app is signed for development.", comment: ""))
     }
 
     // MARK: Apps List
@@ -153,7 +153,7 @@ struct InstalledAppsListView: View {
                 }
 
                 if !filteredRecents.isEmpty {
-                    glassSection(title: "Recents".localized) {
+                    glassSection(title: NSLocalizedString("Recents", comment: "")) {
                         LazyVStack(spacing: 12) {
                             ForEach(filteredRecents, id: \.self) { bundleID in
                                 AppButton(
@@ -171,7 +171,7 @@ struct InstalledAppsListView: View {
                     }
                 }
 
-                glassSection(title: "All Applications".localized) {
+                glassSection(title: NSLocalizedString("All Applications", comment: "")) {
                     LazyVStack(spacing: 12) {
                         ForEach(viewModel.apps.sorted(by: { $0.key < $1.key }), id: \.key) { bundleID, appName in
                             AppButton(
@@ -285,7 +285,7 @@ struct AppButton: View {
         .contextMenu {
             Button(action: toggleFavorite) {
                 Label(
-                    favoriteApps.contains(bundleID) ? "Remove Favorite" : "Add to Favorites",
+                    favoriteApps.contains(bundleID) ? NSLocalizedString("Remove Favorite", comment: "") : NSLocalizedString("Add to Favorites", comment: ""),
                     systemImage: favoriteApps.contains(bundleID) ? "star.slash" : "star"
                 )
                 .disabled(!favoriteApps.contains(bundleID) && favoriteApps.count >= 4)
@@ -294,11 +294,11 @@ struct AppButton: View {
                 UIPasteboard.general.string = bundleID
                 Haptics.light()
             } label: {
-                Label("Copy Bundle ID", systemImage: "doc.on.doc")
+                Label(NSLocalizedString("Copy Bundle ID", comment: ""), systemImage: "doc.on.doc")
             }
             if enableAdvancedOptions {
                 Button { showScriptPicker = true } label: {
-                    Label("Assign Script", systemImage: "chevron.left.slash.chevron.right")
+                    Label(NSLocalizedString("Assign Script", comment: ""), systemImage: "chevron.left.slash.chevron.right")
                 }
             }
         }
@@ -306,7 +306,7 @@ struct AppButton: View {
             Button {
                 toggleFavorite()
             } label: {
-                Label(favoriteApps.contains(bundleID) ? "Unfavorite" : "Favorite", systemImage: "star")
+                Label(favoriteApps.contains(bundleID) ? NSLocalizedString("Unfavorite", comment: "") : NSLocalizedString("Favorite", comment: ""), systemImage: "star")
             }
             .tint(.yellow)
 
@@ -314,7 +314,7 @@ struct AppButton: View {
                 UIPasteboard.general.string = bundleID
                 Haptics.light()
             } label: {
-                Label("Copy ID", systemImage: "doc.on.doc")
+                Label(NSLocalizedString("Copy ID", comment: ""), systemImage: "doc.on.doc")
             }
         }
         .sheet(isPresented: $showScriptPicker) {
@@ -330,7 +330,7 @@ struct AppButton: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(appName)")
-        .accessibilityHint("Double-tap to select. Swipe for actions, long-press for options.")
+        .accessibilityHint(NSLocalizedString("Double-tap to select. Swipe for actions, long-press for options.", comment: ""))
     }
 
     // MARK: Icon

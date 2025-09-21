@@ -86,7 +86,7 @@ struct LocationSimulatorView: View {
                 HStack() {
                     Text("")
                     Text("")
-                    Text("Location Simulator")
+                    Text(NSLocalizedString("Location Simulator", comment: ""))
                         .font(.largeTitle.bold())
                         .padding(.top)
                     Spacer()
@@ -95,7 +95,7 @@ struct LocationSimulatorView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("Search for a place", text: $searchQuery, onCommit: performSearch)
+                TextField(NSLocalizedString("Search for a place", comment: ""), text: $searchQuery, onCommit: performSearch)
                     .font(.body)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
@@ -113,7 +113,7 @@ struct LocationSimulatorView: View {
                             Button(action: { select(item: item) }) {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.name ?? "Unknown")
+                                        Text(item.name ?? NSLocalizedString("Unknown", comment: ""))
                                             .font(.body)
                                         Text(item.placemark.title ?? "")
                                             .font(.caption)
@@ -143,7 +143,7 @@ struct LocationSimulatorView: View {
 
             if let coord = coordinate {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Selected Coordinates")
+                    Text(NSLocalizedString("Selected Coordinates", comment: ""))
                         .font(.headline)
                     Text(String(format: "%.6f, %.6f", coord.latitude, coord.longitude))
                         .font(.subheadline)
@@ -156,7 +156,7 @@ struct LocationSimulatorView: View {
                 .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                 .padding(.horizontal)
             } else {
-                Text("Long-press on the map or search above to pick a location.")
+                Text(NSLocalizedString("Long-press on the map or search above to pick a location.", comment: ""))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.horizontal)
@@ -164,14 +164,14 @@ struct LocationSimulatorView: View {
 
             HStack(spacing: 12) {
                 Button(action: simulate) {
-                    Label("Simulate", systemImage: "location.fill")
+                    Label(NSLocalizedString("Simulate", comment: ""), systemImage: "location.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(coordinate == nil)
 
                 Button(action: clear) {
-                    Label("Clear", systemImage: "xmark.circle.fill")
+                    Label(NSLocalizedString("Clear", comment: ""), systemImage: "xmark.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -182,7 +182,7 @@ struct LocationSimulatorView: View {
             if !status.isEmpty {
                 Text(status)
                     .font(.callout)
-                    .foregroundColor(status.contains("failed") ? .red : .green)
+                    .foregroundColor(status.contains(NSLocalizedString("failed", comment: "")) ? .red : .green)
                     .padding(.horizontal)
                     .transition(.opacity)
             }
@@ -218,16 +218,18 @@ struct LocationSimulatorView: View {
             pairingFilePath
         )
         if code == 0 {
-            status = "Simulation running…"
+            status = NSLocalizedString("Simulation running…", comment: "")
             showKeepOpenError = true
         } else {
-            status = "Simulation failed (code \(code))."
+            status = String.localizedStringWithFormat(NSLocalizedString("Simulation failed (code %d).", comment: ""), code)
         }
     }
 
     private func clear() {
         let code = clear_simulated_location()
-        status = code == 0 ? "Cleared simulation." : "Clear failed (code \(code))."
+        status = code == 0
+            ? NSLocalizedString("Cleared simulation.", comment: "")
+            : String.localizedStringWithFormat(NSLocalizedString("Clear failed (code %d).", comment: ""), code)
         showKeepOpenError = false
     }
 
@@ -235,8 +237,8 @@ struct LocationSimulatorView: View {
     private var overlayErrorView: some View {
         if showKeepOpenError {
             CustomErrorView(
-                title: "Keep App Open",
-                message: "Your simulation will stop if the app goes to the background. Please keep the app open to continue.",
+                title: NSLocalizedString("Keep App Open", comment: ""),
+                message: NSLocalizedString("Your simulation will stop if the app goes to the background. Please keep the app open to continue.", comment: ""),
                 onDismiss: { showKeepOpenError = false },
                 primaryButtonText: "OK",
                 showSecondaryButton: false,

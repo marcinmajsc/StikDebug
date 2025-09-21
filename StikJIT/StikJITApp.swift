@@ -860,7 +860,7 @@ class MountingProgress: ObservableObject {
                 )
                 
                 if mountResult != 0 {
-                    showAlert(title: "Error", message: "An Error Occured when Mounting the DDI\nError Code: \(mountResult)", showOk: true, showTryAgain: true) { shouldTryAgain in
+                    showAlert(title: NSLocalizedString("Error", comment: ""), message: String.localizedStringWithFormat(NSLocalizedString("An Error Occurred when Mounting the DDI\nError Code: %d", comment: ""), mountResult), showOk: true, showTryAgain: true) { shouldTryAgain in
                         if shouldTryAgain {
                             self.mount()
                         }
@@ -884,7 +884,7 @@ func isPairing() -> Bool {
     var pairingFile: IdevicePairingFile?
     let err = idevice_pairing_file_read(pairingpath, &pairingFile)
     if let err {
-        print("Failed to read pairing file: \(err.pointee.code)")
+        print(String.localizedStringWithFormat(NSLocalizedString("Failed to read pairing file: %d", comment: ""), err.pointee.code))
         if err.pointee.code == -9 {  // InvalidHostID is -9
             return false
         }
@@ -897,7 +897,7 @@ func startHeartbeatInBackground() {
     let heartBeatThread = Thread {
         let completionHandler: @convention(block) (Int32, String?) -> Void = { result, message in
             if result == 0 {
-                print("Heartbeat started successfully: \(message ?? "")")
+                print(String(format: NSLocalizedString("Heartbeat started successfully: %@", comment: ""), message ?? ""))
                 pubHeartBeat = true
                 
                 if FileManager.default.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("DDI/Image.dmg.trustcache").path) {
@@ -909,24 +909,24 @@ func startHeartbeatInBackground() {
                     if result == -9 {
                         do {
                             try FileManager.default.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
-                            print("Removed invalid pairing file")
+                            print(NSLocalizedString("Removed invalid pairing file", comment: ""))
                         } catch {
-                            print("Error removing invalid pairing file: \(error)")
+                            print(String(format: NSLocalizedString("Error removing invalid pairing file: %@", comment: ""), String(describing: error)))
                         }
                         
                         showAlert(
-                            title: "Invalid Pairing File",
-                            message: "The pairing file is invalid or expired. Please select a new pairing file.",
+                            title: NSLocalizedString("Invalid Pairing File", comment: ""),
+                            message: NSLocalizedString("The pairing file is invalid or expired. Please select a new pairing file.", comment: ""),
                             showOk: true,
                             showTryAgain: false,
-                            primaryButtonText: "Select New File"
+                            primaryButtonText: NSLocalizedString("Select New File", comment: "")
                         ) { _ in
                             NotificationCenter.default.post(name: NSNotification.Name("ShowPairingFilePicker"), object: nil)
                         }
                     } else {
                         showAlert(
-                            title: "Heartbeat Error",
-                            message: "Failed to connect to Heartbeat (\(result)). Are you connected to WiFi or is Airplane Mode enabled? Cellular data isn’t supported. Please launch the app at least once with WiFi enabled. After that, you can switch to cellular data to turn on the VPN, and once the VPN is active you can use Airplane Mode.",
+                            title: NSLocalizedString("Heartbeat Error", comment: ""),
+                            message: String.localizedStringWithFormat(NSLocalizedString("Failed to connect to Heartbeat (%d). Are you connected to WiFi or is Airplane Mode enabled? Cellular data isn’t supported. Please launch the app at least once with WiFi enabled. After that, you can switch to cellular data to turn on the VPN, and once the VPN is active you can use Airplane Mode.", comment: ""), result),
                             showOk: false,
                             showTryAgain: true
                         ) { shouldTryAgain in
@@ -996,8 +996,8 @@ struct LoadingView: View {
                     animate = true
                     let os = ProcessInfo.processInfo.operatingSystemVersion
                     if os.majorVersion < 17 || (os.majorVersion == 17 && os.minorVersion < 4) {
-                        alertTitle = "Unsupported OS Version".localized
-                        alertMessage = String(format: "StikJIT only supports 17.4 and above. Your device is running iOS/iPadOS %@".localized, "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)")
+                        alertTitle = NSLocalizedString("Unsupported OS Version", comment: "")
+                        alertMessage = String(format: NSLocalizedString("StikJIT only supports 17.4 and above. Your device is running iOS/iPadOS %@", comment: ""), "\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)")
                         showAlert = true
                     }
                 }
@@ -1029,7 +1029,7 @@ public func showAlert(title: String, message: String, showOk: Bool, showTryAgain
                     completion?(false)
                 },
                 showButton: true,
-                primaryButtonText: primaryButtonText ?? "Try Again",
+                primaryButtonText: primaryButtonText ?? NSLocalizedString("Try Again", comment: ""),
                 onPrimaryButtonTap: {
                     completion?(true)
                 },
@@ -1086,24 +1086,24 @@ func downloadFile(from urlString: String, to destinationURL: URL, completion: @e
     let documentsDirectory = URL.documentsDirectory
     
     guard let url = URL(string: urlString) else {
-        print("Invalid URL: \(urlString)")
+        print(String(format: NSLocalizedString("Invalid URL: %@", comment: ""), urlString))
         completion("[Internal Invalid URL error]")
         return
     }
     
     let task = URLSession.shared.downloadTask(with: url) { (tempLocalUrl, response, error) in
         guard let tempLocalUrl = tempLocalUrl, error == nil else {
-            print("Error downloading file from \(urlString): \(String(describing: error))")
-            completion("Are you connected to the internet? [Download Failed]")
+            print(String(format: NSLocalizedString("Error downloading file from %@: %@", comment: ""), urlString, String(describing: error)))
+            completion(NSLocalizedString("Are you connected to the internet? [Download Failed]", comment: ""))
             return
         }
         
         do {
             try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
             try fileManager.moveItem(at: tempLocalUrl, to: destinationURL)
-            print("Downloaded \(urlString) to \(destinationURL.path)")
+            print(String(format: NSLocalizedString("Downloaded %@ to %@", comment: ""), urlString, destinationURL.path))
         } catch {
-            print("Error saving file: \(error)")
+            print(String(format: NSLocalizedString("Error saving file: %@", comment: ""), String(describing: error)))
         }
     }
     task.resume()

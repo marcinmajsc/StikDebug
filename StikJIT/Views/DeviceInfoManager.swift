@@ -34,7 +34,7 @@ final class DeviceInfoManager: ObservableObject {
             let code = path.withCString { c_deviceinfo_init($0) }
             await MainActor.run {
                 if code != 0 {
-                    self.error = ("Initialization Failed", self.initErrorMessage(code))
+                    self.error = (NSLocalizedString("Initialization Failed", comment: ""), self.initErrorMessage(code))
                     self.busy = false
                 } else {
                     self.initialized = true
@@ -49,7 +49,7 @@ final class DeviceInfoManager: ObservableObject {
         Task.detached {
             guard let cXml = c_deviceinfo_get_xml() else {
                 await MainActor.run {
-                    self.error = ("Fetch Error", "Failed to fetch device info")
+                    self.error = (NSLocalizedString("Fetch Error", comment: ""), NSLocalizedString("Failed to fetch device info", comment: ""))
                     self.busy = false
                 }
                 return
@@ -57,7 +57,7 @@ final class DeviceInfoManager: ObservableObject {
             defer { free(UnsafeMutableRawPointer(mutating: cXml)) }
             guard let xml = String(validatingUTF8: cXml) else {
                 await MainActor.run {
-                    self.error = ("Parse Error", "Invalid XML data")
+                    self.error = (NSLocalizedString("Parse Error", comment: ""), NSLocalizedString("Invalid XML data", comment: ""))
                     self.busy = false
                 }
                 return
@@ -75,7 +75,7 @@ final class DeviceInfoManager: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
-                    self.error = ("Parse Error", error.localizedDescription)
+                    self.error = (NSLocalizedString("Parse Error", comment: ""), error.localizedDescription)
                     self.busy = false
                 }
             }
@@ -89,11 +89,11 @@ final class DeviceInfoManager: ObservableObject {
 
     private func initErrorMessage(_ code: Int32) -> String {
         switch code {
-        case 1: return "Couldn’t read pairingFile.plist"
-        case 2: return "Unable to create device provider"
-        case 3: return "Cannot connect to lockdown service"
-        case 4: return "Unable to start lockdown session"
-        default: return "Unknown init error (\(code))"
+        case 1: return NSLocalizedString("Couldn’t read pairingFile.plist", comment: "")
+        case 2: return NSLocalizedString("Unable to create device provider", comment: "")
+        case 3: return NSLocalizedString("Cannot connect to lockdown service", comment: "")
+        case 4: return NSLocalizedString("Unable to start lockdown session", comment: "")
+        default: return String(format: NSLocalizedString("Unknown init error (%d)", comment: ""), code)
         }
     }
 
@@ -165,7 +165,7 @@ struct DeviceInfoView: View {
 
                 if mgr.busy {
                     Color.black.opacity(0.35).ignoresSafeArea()
-                    ProgressView("Fetching device info…")
+                    ProgressView(NSLocalizedString("Fetching device info…", comment: ""))
                         .padding(16)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -188,7 +188,7 @@ struct DeviceInfoView: View {
                 if justCopied {
                     VStack {
                         Spacer()
-                        Text("Copied")
+                        Text(NSLocalizedString("Copied", comment: ""))
                             .font(.footnote.weight(.semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -201,12 +201,12 @@ struct DeviceInfoView: View {
                     .animation(.easeInOut(duration: 0.25), value: justCopied)
                 }
             }
-            .navigationTitle("Device Info")
+            .navigationTitle(NSLocalizedString("Device Info", comment: ""))
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if isPaired {
                         Button { mgr.initAndLoad() } label: {
-                            Label("Reload", systemImage: "arrow.clockwise")
+                            Label(NSLocalizedString("Reload", comment: ""), systemImage: "arrow.clockwise")
                         }
 
                         Button {
@@ -214,22 +214,22 @@ struct DeviceInfoView: View {
                                 exportURL = try mgr.exportToCSV()
                                 isShowingExporter = true
                             } catch {
-                                fail("Export Failed", error.localizedDescription)
+                                fail(NSLocalizedString("Export Failed", comment: ""), error.localizedDescription)
                             }
                         } label: {
-                            Label("Export", systemImage: "square.and.arrow.up")
+                            Label(NSLocalizedString("Export", comment: ""), systemImage: "square.and.arrow.up")
                         }
                         .disabled(mgr.entries.isEmpty)
 
                         Menu {
                             Button { copyAllText() } label: {
-                                Label("Copy All (Text)", systemImage: "doc.on.doc")
+                                Label(NSLocalizedString("Copy All (Text)", comment: ""), systemImage: "doc.on.doc")
                             }
                             Button { copyAllCSV() } label: {
-                                Label("Copy All (CSV)", systemImage: "tablecells")
+                                Label(NSLocalizedString("Copy All (CSV)", comment: ""), systemImage: "tablecells")
                             }
                             Button { shareAll() } label: {
-                                Label("Share…", systemImage: "square.and.arrow.up.on.square")
+                                Label(NSLocalizedString("Share…", comment: ""), systemImage: "square.and.arrow.up.on.square")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -240,7 +240,7 @@ struct DeviceInfoView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     if !isPaired {
                         Button { importer = true } label: {
-                            Label("Import Pairing File", systemImage: "doc.badge.plus")
+                            Label(NSLocalizedString("Import Pairing File", comment: ""), systemImage: "doc.badge.plus")
                         }
                     }
                 }
@@ -253,7 +253,7 @@ struct DeviceInfoView: View {
                 document: CSVDocument(url: exportURL),
                 contentType: .commaSeparatedText,
                 defaultFilename: "DeviceInfo"
-            ) { _ in notify("Export Complete", "Device info exported to CSV") }
+            ) { _ in notify(NSLocalizedString("Export Complete", comment: ""), NSLocalizedString("Device info exported to CSV", comment: "")) }
             .sheet(isPresented: $showShareSheet) {
                 ActivityViewController(items: shareItems)
             }
@@ -266,7 +266,7 @@ struct DeviceInfoView: View {
 
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            TextField("Search device info…", text: $searchText)
+            TextField(NSLocalizedString("Search device info…", comment: ""), text: $searchText)
                 .padding(12)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
@@ -277,9 +277,9 @@ struct DeviceInfoView: View {
 
             if !isPaired {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("No pairing file detected", systemImage: "exclamationmark.triangle.fill")
+                    Label(NSLocalizedString("No pairing file detected", comment: ""), systemImage: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
-                    Text("Import your device’s pairing file to get started.")
+                    Text(NSLocalizedString("Import your device’s pairing file to get started.", comment: ""))
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -287,7 +287,7 @@ struct DeviceInfoView: View {
             }
 
             if mgr.entries.isEmpty {
-                Text(mgr.busy ? "Loading…" : (isPaired ? "No info available" : ""))
+                Text(mgr.busy ? NSLocalizedString("Loading…", comment: "") : (isPaired ? NSLocalizedString("No info available", comment: "") : ""))
                     .foregroundColor(.secondary)
             } else {
                 ForEach(filteredEntries, id: \.key) { entry in
@@ -380,10 +380,10 @@ struct DeviceInfoView: View {
             }
             try FileManager.default.copyItem(at: src, to: pairingURL)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: pairingURL.path)
-            notify("Pairing File Added", "Your device is ready. Tap Reload to fetch info.")
+            notify(NSLocalizedString("Pairing File Added", comment: ""), NSLocalizedString("Your device is ready. Tap Reload to fetch info.", comment: ""))
             mgr.initAndLoad()
         } catch {
-            fail("Import Failed", error.localizedDescription)
+            fail(NSLocalizedString("Import Failed", comment: ""), error.localizedDescription)
         }
     }
 
@@ -404,7 +404,7 @@ struct CSVDocument: FileDocument {
     static var writableContentTypes: [UTType] { [UTType.commaSeparatedText] }
     let url: URL?
     init(url: URL?) { self.url = url }
-    init(configuration: ReadConfiguration) throws { fatalError("Not supported") }
+    init(configuration: ReadConfiguration) throws { fatalError(NSLocalizedString("Not supported", comment: "")) }
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         guard let url = url else { throw NSError(domain: "CSVDocument", code: -1) }
         return try FileWrapper(url: url, options: .immediate)

@@ -24,7 +24,7 @@ struct AccentColorPicker: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Accent Color")
+            Text(NSLocalizedString("Accent Color", comment: ""))
                 .font(.headline)
                 .foregroundColor(.primary)
             
@@ -121,7 +121,7 @@ struct DisplayView: View {
                 if justSaved {
                     VStack {
                         Spacer()
-                        Text("Saved")
+                        Text(NSLocalizedString("Saved", comment: ""))
                             .font(.footnote.weight(.semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -134,7 +134,7 @@ struct DisplayView: View {
                     .animation(.easeInOut(duration: 0.25), value: justSaved)
                 }
             }
-            .navigationTitle("Display")
+            .navigationTitle(NSLocalizedString("Display", comment: ""))
             .onAppear {
                 loadCustomAccentColor()
                 applyTheme(selectedTheme)
@@ -147,13 +147,13 @@ struct DisplayView: View {
     
     private var usernameCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Username")
+            Text(NSLocalizedString("Username", comment: ""))
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
             
             HStack {
-                TextField("Username", text: $username)
+                TextField(NSLocalizedString("Username", comment: ""), text: $username)
                     .font(.body)
                     .foregroundColor(.primary)
                     .padding(.vertical, 8)
@@ -190,7 +190,7 @@ struct DisplayView: View {
     
     private var accentCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Accent")
+            Text(NSLocalizedString("Accent", comment: ""))
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
@@ -208,7 +208,7 @@ struct DisplayView: View {
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                        Text("Save")
+                        Text(NSLocalizedString("Save", comment: ""))
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
@@ -227,7 +227,7 @@ struct DisplayView: View {
                 } label: {
                     HStack {
                         Image(systemName: "arrow.uturn.backward.circle")
-                        Text("Reset")
+                        Text(NSLocalizedString("Reset", comment: ""))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -254,7 +254,7 @@ struct DisplayView: View {
     
     private var jitOptionsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("App List")
+            Text(NSLocalizedString("App List", comment: ""))
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
@@ -263,7 +263,7 @@ struct DisplayView: View {
                 Toggle("Load App Icons", isOn: $loadAppIconsOnJIT)
                     .tint(accentColor)
                 
-                Text("Disabling this will hide app icons in the app list and may improve performance, while also giving it a more minimalistic look.")
+                Text(NSLocalizedString("Disabling this will hide app icons in the app list and may improve performance, while also giving it a more minimalistic look.", comment: ""))
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
@@ -282,7 +282,7 @@ struct DisplayView: View {
     
     private var themeCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Theme")
+            Text(NSLocalizedString("Theme", comment: ""))
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
