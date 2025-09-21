@@ -402,7 +402,7 @@ struct HomeView: View {
     
     private var toolsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Tools").font(.headline).foregroundColor(.secondary)
+            Text(NSLocalizedString("Tools", comment: "")).font(.headline).foregroundColor(.secondary)
             Button(action: { showingConsoleLogsView = true }) {
                 HStack {
                     Image(systemName: "terminal").font(.system(size: 20))
