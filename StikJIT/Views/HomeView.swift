@@ -169,12 +169,12 @@ struct HomeView: View {
                         }
                         RunLoop.current.add(progressTimer, forMode: .common)
                     } catch {
-                        print(NSLocalizedString("Error copying file" + ": ", comment: ""), error)
+                        print("\(NSLocalizedString("Error copying file", comment: "")): \(error)")
                     }
                 }
                 if accessing { url.stopAccessingSecurityScopedResource() }
             case .failure(let error):
-                print(NSLocalizedString("Failed to import file" + ": ", comment: ""), error)
+                print("\(NSLocalizedString("Failed to import file", comment: "")): \(error)")
             }
         }
         .sheet(isPresented: $isShowingInstalledApps) {
