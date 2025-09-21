@@ -94,7 +94,7 @@ struct HomeView: View {
 
                 if isImportingFile {
                     Color.black.opacity(0.35).ignoresSafeArea()
-                    ProgressView("Processing pairing file…")
+                    ProgressView(NSLocalizedString("Processing pairing file…", comment: ""))
                         .padding(16)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -108,13 +108,13 @@ struct HomeView: View {
                 }
 
                 if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
-                    toast("✓ Pairing file successfully imported")
+                    toast(NSLocalizedString("✓ Pairing file successfully imported", comment: ""))
                 }
                 if justCopied {
-                    toast("Copied")
+                    toast(NSLocalizedString("Copied", comment: ""))
                 }
             }
-            .navigationTitle("Home")
+            .navigationTitle(NSLocalizedString("Home", comment: ""))
         }
         .onAppear {
             checkPairingFileExists()
@@ -169,12 +169,12 @@ struct HomeView: View {
                         }
                         RunLoop.current.add(progressTimer, forMode: .common)
                     } catch {
-                        print("Error copying file: \(error)")
+                        print(NSLocalizedString("Error copying file" + ": ", comment: ""), error)
                     }
                 }
                 if accessing { url.stopAccessingSecurityScopedResource() }
             case .failure(let error):
-                print("Failed to import file: \(error)")
+                print(NSLocalizedString("Failed to import file" + ": ", comment: ""), error)
             }
         }
         .sheet(isPresented: $isShowingInstalledApps) {
@@ -237,7 +237,7 @@ struct HomeView: View {
                     RunJSView(model: jsModel)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
-                                Button("Done") { scriptViewShow = false }
+                                Button(NSLocalizedString("Done", comment: "")) { scriptViewShow = false }
                             }
                         }
                         .navigationTitle(selectedScript)
@@ -315,7 +315,7 @@ struct HomeView: View {
                 Button(action: primaryActionTapped) {
                     whiteCardButtonLabel(
                         icon: pairingFileExists ? "cable.connector.horizontal" : "doc.badge.plus",
-                        title: pairingFileExists ? "Connect by App" : "Select Pairing File"
+                        title: pairingFileExists ? NSLocalizedString("Connect by App", comment: "") : NSLocalizedString("Select Pairing File", comment: "")
                     )
                 }
                 .disabled(pairingFileExists && !ddiMounted)
@@ -323,7 +323,7 @@ struct HomeView: View {
                 
                 if pairingFileExists && enableAdvancedOptions {
                     Button(action: { showPIDSheet = true }) {
-                        whiteCardButtonLabel(icon: "number.circle", title: "Connect by PID")
+                        whiteCardButtonLabel(icon: "number.circle", title: NSLocalizedString("Connect by PID", comment: ""))
                     }
                 }
             }
@@ -331,7 +331,7 @@ struct HomeView: View {
             if isImportingFile {
                 VStack(spacing: 8) {
                     HStack {
-                        Text("Processing pairing file…")
+                        Text(NSLocalizedString("Processing pairing file…", comment: ""))
                             .font(.system(.caption, design: .rounded))
                             .foregroundColor(.secondary)
                         Spacer()
@@ -353,7 +353,7 @@ struct HomeView: View {
             } else if showPairingFileMessage && pairingFileIsValid {
                 HStack(spacing: 10) {
                     StatusDot(color: .green)
-                    Text("Pairing file successfully imported")
+                    Text(NSLocalizedString("Pairing file successfully imported", comment: ""))
                         .font(.system(.callout, design: .rounded))
                         .foregroundColor(.green)
                 }
@@ -406,7 +406,7 @@ struct HomeView: View {
             Button(action: { showingConsoleLogsView = true }) {
                 HStack {
                     Image(systemName: "terminal").font(.system(size: 20))
-                    Text("Open Console").font(.system(.title3, design: .rounded)).fontWeight(.semibold)
+                    Text(NSLocalizedString("Open Console", comment: "")).font(.system(.title3, design: .rounded)).fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -433,14 +433,14 @@ struct HomeView: View {
     
     private var tipsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Tips").font(.headline).foregroundColor(.secondary)
+            Text(NSLocalizedString("Tips", comment: "")).font(.headline).foregroundColor(.secondary)
             if !pairingFileExists {
-                tipRow(systemImage: "doc.badge.plus", title: "Pairing file required", message: "Import your device’s pairing file to begin.")
+                tipRow(systemImage: "doc.badge.plus", title: NSLocalizedString("Pairing file required", comment: ""), message: NSLocalizedString("Import your device’s pairing file to begin.", comment: ""))
             }
             if pairingFileExists && !ddiMounted {
-                tipRow(systemImage: "externaldrive.badge.exclamationmark", title: "Developer Disk Image not mounted", message: "Go to Settings → Developer Disk Image and ensure it’s mounted.")
+                tipRow(systemImage: "externaldrive.badge.exclamationmark", title: NSLocalizedString("Developer Disk Image not mounted", comment: ""), message: NSLocalizedString("Go to Settings → Developer Disk Image and ensure it’s mounted.", comment: ""))
             }
-            tipRow(systemImage: "lock.shield", title: "Local only", message: "StikDebug runs entirely on-device. No data leaves your device.")
+            tipRow(systemImage: "lock.shield", title: NSLocalizedString("Local only", comment: ""), message: NSLocalizedString("StikDebug runs entirely on-device. No data leaves your device.", comment: ""))
             
             Button {
                 if let url = URL(string: "https://github.com/StephenDev0/StikDebug-Guide/blob/main/pairing_file.md") {
@@ -452,9 +452,9 @@ struct HomeView: View {
                         .foregroundColor(accentColor)
                         .font(.system(size: 18))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Pairing File Guide")
+                        Text(NSLocalizedString("Pairing File Guide", comment: ""))
                             .font(.subheadline).fontWeight(.semibold)
-                        Text("Learn how to create and import your pairing file.")
+                        Text(NSLocalizedString("Learn how to create and import your pairing file.", comment: ""))
                             .font(.footnote)
                             .foregroundColor(.secondary)
                     }
@@ -655,7 +655,7 @@ struct HomeView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Dismiss")
+                .accessibilityLabel(NSLocalizedString("Dismiss", comment: ""))
             }
         }
         .padding(14)
@@ -669,7 +669,7 @@ struct HomeView: View {
         )
         .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing.")
+        .accessibilityLabel(NSLocalizedString("Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing.", comment: ""))
     }
 }
 
@@ -714,9 +714,9 @@ private struct ConnectByPIDSheet: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("Enter a Process ID").font(.headline).foregroundColor(.primary)
+                            Text(NSLocalizedString("Enter a Process ID", comment: "")).font(.headline).foregroundColor(.primary)
                             
-                            TextField("e.g. 1234", text: $pidText)
+                            TextField(NSLocalizedString("e.g. 1234", comment: ""), text: $pidText)
                                 .keyboardType(.numberPad)
                                 .textContentType(.oneTimeCode)
                                 .font(.system(.title3, design: .rounded))
@@ -734,19 +734,19 @@ private struct ConnectByPIDSheet: View {
 
                             // Paste + Clear row
                             HStack(spacing: 10) {
-                                CapsuleButton(systemName: "doc.on.clipboard", title: "Paste", height: capsuleHeight) {
+                                CapsuleButton(systemName: "doc.on.clipboard", title: NSLocalizedString("Paste", comment: ""), height: capsuleHeight) {
                                     if let n = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
                                        let v = Int(n), v > 0 {
                                         pidText = String(v)
                                         validate(pidText)
                                         onPasteCopyToast()
                                     } else {
-                                        errorText = "No valid PID on the clipboard."
+                                        errorText = NSLocalizedString("No valid PID on the clipboard.", comment: "")
                                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     }
                                 }
 
-                                CapsuleButton(systemName: "xmark", title: "Clear", height: capsuleHeight) {
+                                CapsuleButton(systemName: "xmark", title: NSLocalizedString("Clear", comment: ""), height: capsuleHeight) {
                                     pidText = ""
                                     errorText = nil
                                 }
@@ -785,7 +785,7 @@ private struct ConnectByPIDSheet: View {
                                                 .contextMenu {
                                                     Button(role: .destructive) {
                                                         removeRecent(pid)
-                                                    } label: { Label("Remove", systemImage: "trash") }
+                                                    } label: { Label(NSLocalizedString("Remove", comment: ""), systemImage: "trash") }
                                                 }
                                             }
                                         }
@@ -801,7 +801,7 @@ private struct ConnectByPIDSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "bolt.horizontal.circle").font(.system(size: 20))
-                                    Text("Connect")
+                                    Text(NSLocalizedString("Connect", comment: ""))
                                         .font(.system(.title3, design: .rounded))
                                         .fontWeight(.semibold)
                                 }
@@ -832,7 +832,7 @@ private struct ConnectByPIDSheet: View {
                     .padding(.vertical, 30)
                 }
             }
-            .navigationTitle("Connect by PID")
+            .navigationTitle(NSLocalizedString("Connect by PID", comment: ""))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } } }
             .onAppear { focused = true }
@@ -856,7 +856,7 @@ private struct ConnectByPIDSheet: View {
     
     private func validate(_ text: String) {
         if text.isEmpty { errorText = nil; return }
-        if Int(text) == nil || Int(text)! <= 0 { errorText = "Please enter a positive number." }
+        if Int(text) == nil || Int(text)! <= 0 { errorText = NSLocalizedString("Please enter a positive number.", comment: "") }
         else { errorText = nil }
     }
     private func addRecent(_ pid: Int) {

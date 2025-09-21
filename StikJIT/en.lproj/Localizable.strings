@@ -40,3 +40,35 @@
 "Import your pairing file to get started." = "Import your pairing file to get started.";
 "Important for iOS 26+" = "Important for iOS 26+";
 "Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time." = "Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time.";
+"Processing pairing file…"
+"✓ Pairing file successfully imported"
+"Copied" = "Copied";
+"Error copying file" = "Error copying file";
+"Failed to import file" = "Failed to import file";
+"Done" = "Done";
+"Connect by App" = "Connect by App";
+"Select Pairing File" = "Select Pairing File";
+"Connect by PID" = "Connect by PID";
+"Processing pairing file…" = "Processing pairing file…";
+"Pairing file successfully imported" = "Pairing file successfully imported";
+"Open Console" = "Open Console";
+"Tips" = "Tips";
+"Pairing file required" = "Pairing file required";
+"Import your device’s pairing file to begin." = "Import your device’s pairing file to begin.";
+"Developer Disk Image not mounted" = "Developer Disk Image not mounted";
+"Go to Settings → Developer Disk Image and ensure it’s mounted." = "Go to Settings → Developer Disk Image and ensure it’s mounted.";
+"Local only" = "Local only";
+"StikDebug runs entirely on-device. No data leaves your device." = "StikDebug runs entirely on-device. No data leaves your device.";
+"Pairing File Guide" = "Pairing File Guide";
+"Learn how to create and import your pairing file." = "Learn how to create and import your pairing file.";
+"Dismiss" = "Dismiss";
+"Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing." = "Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing.";
+"Enter a Process ID" = "Enter a Process ID";
+"e.g. 1234" = "e.g. 1234";
+"Paste" = "Paste";
+"No valid PID on the clipboard." = "No valid PID on the clipboard.";
+"Clear" = "Clear";
+"Remove" = "Remove";
+"Connect" = "Connect";
+"Connect by PID" = "Connect by PID";
+"Please enter a positive number." = "Please enter a positive number.";
