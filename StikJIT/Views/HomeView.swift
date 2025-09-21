@@ -41,7 +41,7 @@ struct HomeView: View {
     
     @State private var viewDidAppeared = false
     @State private var pendingJITEnableConfiguration : JITEnableConfiguration? = nil
-    @AppStorage("enableAdvancedOptions") private var enableAdvancedOptions = true
+    @AppStorage("enableAdvancedOptions") private var enableAdvancedOptions = false
 
     @AppStorage("useDefaultScript") private var useDefaultScript = false
     @AppStorage("enablePiP") private var enablePiP = true
