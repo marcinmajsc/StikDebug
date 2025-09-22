@@ -567,7 +567,7 @@ struct HeartbeatApp: App {
                             .onAppear {
                                 dnsChecker.checkDNS()
                                 timeoutTimer?.invalidate()
-                                timeoutTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { _ in
+                                timeoutTimer = Timer.scheduledTimer(withTimeInterval: 7, repeats: false) { _ in
                                     if isLoading2 {
                                         showTimeoutError = true
                                     }
