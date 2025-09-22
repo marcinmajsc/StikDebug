@@ -11,34 +11,25 @@
 #include <string.h>
 #import "applist.h"
 
-NSDictionary<NSString*, NSString*>* list_installed_apps(IdeviceProviderHandle* provider, NSString** error) {
-    InstallationProxyClientHandle *client = NULL;
-    if (installation_proxy_connect_tcp(provider, &client)) {
-        *error = @"Failed to connect to installation proxy";
-        return nil;
-    }
-
-    void *apps = NULL;
-    size_t count = 0;
-    if (installation_proxy_get_apps(client, "User", NULL, 0, &apps, &count)) {
-        installation_proxy_client_free(client);
-        *error = @"Failed to get apps";
-        return nil;
-    }
-
+static NSDictionary<NSString*, NSString*> *buildAppDictionary(void *apps,
+                                                             size_t count,
+                                                             BOOL requireGetTaskAllow)
+{
     NSMutableDictionary<NSString*, NSString*> *result = [NSMutableDictionary dictionaryWithCapacity:count];
 
     for (size_t i = 0; i < count; i++) {
         plist_t app = ((plist_t *)apps)[i];
         plist_t ent = plist_dict_get_item(app, "Entitlements");
-        if (!ent) continue;
 
-        plist_t tnode = plist_dict_get_item(ent, "get-task-allow");
-        if (!tnode) continue;
+        if (requireGetTaskAllow) {
+            if (!ent) continue;
+            plist_t tnode = plist_dict_get_item(ent, "get-task-allow");
+            if (!tnode) continue;
 
-        uint8_t isAllowed = 0;
-        plist_get_bool_val(tnode, &isAllowed);
-        if (!isAllowed) continue;
+            uint8_t isAllowed = 0;
+            plist_get_bool_val(tnode, &isAllowed);
+            if (!isAllowed) continue;
+        }
 
         plist_t bidNode = plist_dict_get_item(app, "CFBundleIdentifier");
         if (!bidNode) continue;
@@ -49,6 +40,7 @@ NSDictionary<NSString*, NSString*>* list_installed_apps(IdeviceProviderHandle* p
             free(bidC);
             continue;
         }
+
         NSString *bundleID = [NSString stringWithUTF8String:bidC];
         free(bidC);
 
@@ -66,8 +58,38 @@ NSDictionary<NSString*, NSString*>* list_installed_apps(IdeviceProviderHandle* p
         result[bundleID] = appName;
     }
 
+    return result;
+}
+
+static NSDictionary<NSString*, NSString*> *performAppQuery(IdeviceProviderHandle *provider,
+                                                           BOOL requireGetTaskAllow,
+                                                           NSString **error)
+{
+    InstallationProxyClientHandle *client = NULL;
+    if (installation_proxy_connect_tcp(provider, &client)) {
+        *error = @"Failed to connect to installation proxy";
+        return nil;
+    }
+
+    void *apps = NULL;
+    size_t count = 0;
+    if (installation_proxy_get_apps(client, NULL, NULL, 0, &apps, &count)) {
+        installation_proxy_client_free(client);
+        *error = @"Failed to get apps";
+        return nil;
+    }
+
+    NSDictionary<NSString*, NSString*> *result = buildAppDictionary(apps, count, requireGetTaskAllow);
     installation_proxy_client_free(client);
     return result;
+}
+
+NSDictionary<NSString*, NSString*>* list_installed_apps(IdeviceProviderHandle* provider, NSString** error) {
+    return performAppQuery(provider, YES, error);
+}
+
+NSDictionary<NSString*, NSString*>* list_all_apps(IdeviceProviderHandle* provider, NSString** error) {
+    return performAppQuery(provider, NO, error);
 }
 
 UIImage* getAppIcon(IdeviceProviderHandle* provider, NSString* bundleID, NSString** error) {

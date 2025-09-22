@@ -302,3 +302,114 @@ int debug_app_pid(IdeviceProviderHandle* tcp_provider, int pid, LogFuncC logger,
     logger("Debug session completed");
     return 0;
 }
+
+int launch_app_via_proxy(IdeviceProviderHandle* tcp_provider, const char *bundle_id, LogFuncC logger) {
+    idevice_init_logger(Info, Disabled, NULL);
+    IdeviceFfiError* err = NULL;
+
+    CoreDeviceProxyHandle *core_device = NULL;
+    err = core_device_proxy_connect(tcp_provider, &core_device);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to connect to CoreDeviceProxy: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        return 1;
+    }
+
+    uint16_t rsd_port;
+    err = core_device_proxy_get_server_rsd_port(core_device, &rsd_port);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to get server RSD port: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        core_device_proxy_free(core_device);
+        return 1;
+    }
+
+    AdapterHandle *adapter = NULL;
+    err = core_device_proxy_create_tcp_adapter(core_device, &adapter);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to create TCP adapter: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        core_device_proxy_free(core_device);
+        return 1;
+    }
+
+    AdapterStreamHandle *stream = NULL;
+    err = adapter_connect(adapter, rsd_port, (ReadWriteOpaque **)&stream);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to connect to RSD port: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        adapter_free(adapter);
+        core_device_proxy_free(core_device);
+        return 1;
+    }
+
+    RsdHandshakeHandle *handshake = NULL;
+    err = rsd_handshake_new((ReadWriteOpaque *)stream, &handshake);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to perform RSD handshake: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        adapter_close(stream);
+        adapter_free(adapter);
+        core_device_proxy_free(core_device);
+        return 1;
+    }
+
+    RemoteServerHandle *remote_server = NULL;
+    err = remote_server_connect_rsd(adapter, handshake, &remote_server);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to create remote server: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        rsd_handshake_free(handshake);
+        adapter_free(adapter);
+        core_device_proxy_free(core_device);
+        return 1;
+    }
+
+    ProcessControlHandle *process_control = NULL;
+    err = process_control_new(remote_server, &process_control);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to create process control client: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        remote_server_free(remote_server);
+        rsd_handshake_free(handshake);
+        adapter_free(adapter);
+        core_device_proxy_free(core_device);
+        return 1;
+    }
+
+    uint64_t pid = 0;
+    err = process_control_launch_app(process_control,
+                                     bundle_id,
+                                     NULL,
+                                     0,
+                                     NULL,
+                                     0,
+                                     false,
+                                     true,
+                                     &pid);
+    if (err != NULL) {
+        fprintf(stderr, "Failed to launch app: [%d] %s\n", err->code, err->message);
+        idevice_error_free(err);
+        process_control_free(process_control);
+        remote_server_free(remote_server);
+        rsd_handshake_free(handshake);
+        adapter_free(adapter);
+        core_device_proxy_free(core_device);
+        if (logger) {
+            logger("Failed to launch app: %s", bundle_id);
+        }
+        return 1;
+    }
+
+    if (logger) {
+        logger("Launched app (PID %llu)", pid);
+    }
+
+    process_control_free(process_control);
+    remote_server_free(remote_server);
+    rsd_handshake_free(handshake);
+    adapter_free(adapter);
+    core_device_proxy_free(core_device);
+
+    return 0;
+}
