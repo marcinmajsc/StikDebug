@@ -503,7 +503,7 @@ struct HomeView: View {
     private func primaryActionTapped() {
         if pairingFileExists {
             if !ddiMounted {
-                showAlert(title: "Device Not Mounted".localized, message: "The Developer Disk Image has not been mounted yet. Check in settings for more information.".localized, showOk: true) { _ in }
+                showAlert(title: NSLocalizedString("Device Not Mounted", comment: ""), message: NSLocalizedString("The Developer Disk Image has not been mounted yet. Check in settings for more information.", comment: ""), showOk: true) { _ in }
                 return
             }
             isShowingInstalledApps = true
@@ -547,14 +547,14 @@ struct HomeView: View {
             scriptViewShow = true
             DispatchQueue.global(qos: .background).async {
                 do { try jsModel?.runScript(data: script, name: name) }
-                catch { showAlert(title: "Error Occurred While Executing the Default Script.".localized, message: error.localizedDescription, showOk: true) }
+                catch { showAlert(title: NSLocalizedString("Error Occurred While Executing the Default Script.", comment: ""), message: error.localizedDescription, showOk: true) }
             }
         }
     }
     
     private func startJITInBackground(bundleID: String? = nil, pid : Int? = nil, scriptData: Data? = nil, scriptName: String? = nil, triggeredByURLScheme: Bool = false) {
         isProcessing = true
-        LogManager.shared.addInfoLog("Starting Debug for \(bundleID ?? String(pid ?? 0))")
+        LogManager.shared.addInfoLog(String(format: NSLocalizedString("Starting Debug for %@", comment: ""), bundleID ?? String(pid ?? 0)))
         
         DispatchQueue.global(qos: .background).async {
             var scriptData = scriptData
@@ -568,7 +568,10 @@ struct HomeView: View {
                     let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                         .appendingPathComponent("scripts").appendingPathComponent(scriptName)
                     if FileManager.default.fileExists(atPath: url.path) {
-                        do { scriptData = try Data(contentsOf: url) } catch { print("script load error: \(error)") }
+                        do { scriptData = try Data(contentsOf: url) }
+                        catch {
+                            print(String(format: NSLocalizedString("script load error: %@", comment: ""), error.localizedDescription))
+                        }
                     }
                 }
             } else {
@@ -593,14 +596,14 @@ struct HomeView: View {
                 success = JITEnableContext.shared.debugApp(withBundleID: bundleID, logger: logger, jsCallback: callback)
             } else {
                 DispatchQueue.main.async {
-                    showAlert(title: "Failed to Debug App".localized, message: "Either bundle ID or PID should be specified.".localized, showOk: true)
+                    showAlert(title: NSLocalizedString("Failed to Debug App", comment: ""), message: NSLocalizedString("Either bundle ID or PID should be specified.", comment: ""), showOk: true)
                 }
                 success = false
             }
             
             if success {
                 DispatchQueue.main.async {
-                    LogManager.shared.addInfoLog("Debug process completed for \(bundleID ?? String(pid ?? 0))")
+                    LogManager.shared.addInfoLog(String(format: NSLocalizedString("Debug process completed for %@", comment: ""), bundleID ?? String(pid ?? 0)))
                 }
             }
             isProcessing = false
@@ -764,7 +767,7 @@ private struct ConnectByPIDSheet: View {
                             
                             if !recentPIDs.isEmpty {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("Recents")
+                                    Text(NSLocalizedString("Recents", comment: ""))
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundColor(.secondary)
                                     ScrollView(.horizontal, showsIndicators: false) {
@@ -834,7 +837,7 @@ private struct ConnectByPIDSheet: View {
             }
             .navigationTitle(NSLocalizedString("Connect by PID", comment: ""))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(NSLocalizedString("Cancel", comment: "")) { dismiss() } } }
             .onAppear { focused = true }
         }
     }

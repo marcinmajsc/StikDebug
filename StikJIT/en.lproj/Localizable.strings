@@ -221,4 +221,12 @@ Error Code: %d";
 "Are you sure you want to delete %@? This cannot be undone." = "Are you sure you want to delete %@? This cannot be undone.";
 "Failed to get device list: %@" = "Failed to get device list: %@";
 "%lld%%" = "%lld%%";
-
+"Device Not Mounted" = "Device Not Mounted";
+"The Developer Disk Image has not been mounted yet. Check in settings for more information." = "The Developer Disk Image has not been mounted yet. Check in settings for more information.";
+"Error Occurred While Executing the Default Script." = "Error Occurred While Executing the Default Script.";
+"Starting Debug for %@" = "Starting Debug for %@";
+"script load error: %@" = "script load error: %@";
+"Failed to Debug App" = "Failed to Debug App";
+"Either bundle ID or PID should be specified." = "Either bundle ID or PID should be specified.";
+"Debug process completed for %@" = "Debug process completed for %@";
+"Recents" = "Recents";
