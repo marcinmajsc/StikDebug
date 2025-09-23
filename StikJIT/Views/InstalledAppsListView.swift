@@ -38,6 +38,8 @@ struct InstalledAppsListView: View {
     @State private var prefetchedBundleIDs: Set<String> = []
     @State private var selectedTab: AppListTab = .debuggable
     @State private var systemSearchText: String = ""
+    @AppStorage("pinnedSystemApps") private var pinnedSystemApps: [String] = []
+    @AppStorage("pinnedSystemAppNames") private var pinnedSystemAppNames: [String: String] = [:]
 
     @Environment(\.dismiss) private var dismiss
     var onSelectApp: (String) -> Void
@@ -276,6 +278,7 @@ struct InstalledAppsListView: View {
             }
         }
         .onChange(of: selectedTab) { _, _ in prefetchPriorityIcons() }
+        .onChange(of: pinnedSystemApps) { _, _ in prefetchPriorityIcons() }
     }
 
     // MARK: Empty State
@@ -429,6 +432,7 @@ struct InstalledAppsListView: View {
 
         appendUnique(favoriteApps)
         appendUnique(recentApps)
+        appendUnique(pinnedSystemApps)
         appendUnique(debuggableSortedApps.map { $0.key })
         appendUnique(sortedSystemApps.map { $0.key })
         appendUnique(sortedOtherApps.map { $0.key })
@@ -462,6 +466,7 @@ struct InstalledAppsListView: View {
         glassSection(title: "Hidden System Apps".localized) {
             LazyVStack(spacing: 12) {
                 ForEach(apps, id: \.key) { bundleID, appName in
+                    let isPinned = pinnedSystemApps.contains(bundleID)
                     LaunchAppRow(
                         bundleID: bundleID,
                         appName: appName,
@@ -470,6 +475,31 @@ struct InstalledAppsListView: View {
                         performanceMode: performanceMode
                     ) {
                         startLaunching(bundleID: bundleID)
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if isPinned {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.yellow)
+                                .padding(6)
+                        }
+                    }
+                    .contextMenu {
+                        Button((isPinned ? "Remove from Home" : "Add to Home").localized, systemImage: isPinned ? "star.slash" : "star") {
+                            toggleSystemPin(bundleID: bundleID, appName: appName)
+                        }
+                        Button("Copy Bundle ID".localized, systemImage: "doc.on.doc") {
+                            UIPasteboard.general.string = bundleID
+                            Haptics.light()
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
+                            toggleSystemPin(bundleID: bundleID, appName: appName)
+                        } label: {
+                            Label((isPinned ? "Unpin" : "Pin").localized, systemImage: "star")
+                        }
+                        .tint(.yellow)
                     }
                 }
             }
@@ -776,6 +806,8 @@ struct InstalledAppsListView: View {
         var touched = false
         let prevR = (sharedDefaults.array(forKey: "recentApps") as? [String]) ?? []
         let prevF = (sharedDefaults.array(forKey: "favoriteApps") as? [String]) ?? []
+        let prevPinned = (sharedDefaults.array(forKey: "pinnedSystemApps") as? [String]) ?? []
+        let prevPinnedNames = (sharedDefaults.dictionary(forKey: "pinnedSystemAppNames") as? [String: String]) ?? [:]
 
         if prevR != recentApps {
             sharedDefaults.set(recentApps, forKey: "recentApps")
@@ -783,6 +815,14 @@ struct InstalledAppsListView: View {
         }
         if prevF != favoriteApps {
             sharedDefaults.set(favoriteApps, forKey: "favoriteApps")
+            touched = true
+        }
+        if prevPinned != pinnedSystemApps {
+            sharedDefaults.set(pinnedSystemApps, forKey: "pinnedSystemApps")
+            touched = true
+        }
+        if prevPinnedNames != pinnedSystemAppNames {
+            sharedDefaults.set(pinnedSystemAppNames, forKey: "pinnedSystemAppNames")
             touched = true
         }
         if touched { WidgetCenter.shared.reloadAllTimelines() }
@@ -815,6 +855,25 @@ struct InstalledAppsListView: View {
                 }
             }
         }
+    }
+
+    private func toggleSystemPin(bundleID: String, appName: String) {
+        Haptics.light()
+        if let index = pinnedSystemApps.firstIndex(of: bundleID) {
+            pinnedSystemApps.remove(at: index)
+            pinnedSystemAppNames.removeValue(forKey: bundleID)
+        } else {
+            pinnedSystemApps.removeAll { $0 == bundleID }
+            pinnedSystemApps.insert(bundleID, at: 0)
+            pinnedSystemAppNames[bundleID] = appName
+            let maxPins = 8
+            if pinnedSystemApps.count > maxPins {
+                let surplus = Array(pinnedSystemApps.suffix(from: maxPins))
+                for id in surplus { pinnedSystemAppNames.removeValue(forKey: id) }
+                pinnedSystemApps = Array(pinnedSystemApps.prefix(maxPins))
+            }
+        }
+        persistIfChanged()
     }
 }
 
@@ -1408,6 +1467,21 @@ extension Array: @retroactive RawRepresentable where Element: Codable {
         guard let data = try? JSONEncoder().encode(self),
               let result = String(data: data, encoding: .utf8)
         else { return "[]" }
+        return result
+    }
+}
+
+extension Dictionary: @retroactive RawRepresentable where Key: Codable, Value: Codable {
+    public init?(rawValue: String) {
+        guard let data = rawValue.data(using: .utf8),
+              let result = try? JSONDecoder().decode([Key: Value].self, from: data)
+        else { return nil }
+        self = result
+    }
+    public var rawValue: String {
+        guard let data = try? JSONEncoder().encode(self),
+              let result = String(data: data, encoding: .utf8)
+        else { return "{}" }
         return result
     }
 }

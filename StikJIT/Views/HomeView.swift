@@ -9,6 +9,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Pipify
 import UIKit
+import WidgetKit
 
 struct JITEnableConfiguration {
     var bundleID: String? = nil
@@ -59,6 +60,10 @@ struct HomeView: View {
     @State private var heartbeatOK = false
     @State private var cachedAppNames: [String: String] = [:]
     @State private var isLoadingQuickApps = false
+    @AppStorage("pinnedSystemApps") private var pinnedSystemApps: [String] = []
+    @AppStorage("pinnedSystemAppNames") private var pinnedSystemAppNames: [String: String] = [:]
+    @State private var launchingSystemApps: Set<String> = []
+    @State private var systemLaunchMessage: String? = nil
 
     @AppStorage("showiOS26Disclaimer") private var showiOS26Disclaimer: Bool = true
 
@@ -96,6 +101,9 @@ struct HomeView: View {
 
                         readinessCard
                         quickConnectCard
+                        if !systemPinnedItems.isEmpty {
+                            systemAppsCard
+                        }
                         toolsCard
                         tipsCard
                     }
@@ -123,6 +131,9 @@ struct HomeView: View {
                 }
                 if justCopied {
                     toast("Copied")
+                }
+                if let message = systemLaunchMessage {
+                    toast(message)
                 }
             }
             .navigationTitle("Home")
@@ -218,37 +229,10 @@ struct HomeView: View {
                 
                 var autoScriptData: Data? = nil
                 var autoScriptName: String? = nil
-                
-                let appName: String? = (try? JITEnableContext.shared.getAppList()[selectedBundle])
-                
-                if #available(iOS 26, *) {
-                    if ProcessInfo.processInfo.hasTXM, let appName {
-                        if appName == "maciOS" {
-                            if let url = Bundle.main.url(forResource: "script1", withExtension: "js"),
-                               let data = try? Data(contentsOf: url) {
-                                autoScriptData = data
-                                autoScriptName = "script1.js"
-                            }
-                        } else if appName == "Amethyst" {
-                            if let url = Bundle.main.url(forResource: "script2", withExtension: "js"),
-                               let data = try? Data(contentsOf: url) {
-                                autoScriptData = data
-                                autoScriptName = "script2.js"
-                            }
-                        } else if appName == "MeloNX" {
-                            if let url = Bundle.main.url(forResource: "melo", withExtension: "js"),
-                               let data = try? Data(contentsOf: url) {
-                                autoScriptData = data
-                                autoScriptName = "melo.js"
-                            }
-                        } else if appName == "UTM" {
-                            if let url = Bundle.main.url(forResource: "utmjit", withExtension: "js"),
-                               let data = try? Data(contentsOf: url) {
-                                autoScriptData = data
-                                autoScriptName = "utmjit.js"
-                            }
-                        }
-                    }
+
+                if let auto = autoScriptForBundleIfNeeded(bundleID: selectedBundle) {
+                    autoScriptData = auto.data
+                    autoScriptName = auto.name
                 }
                 
                 startJITInBackground(bundleID: selectedBundle,
@@ -307,6 +291,15 @@ struct HomeView: View {
             if let scriptName = components?.queryItems?.first(where: { $0.name == "script-name" })?.value {
                 config.scriptName = scriptName
             }
+
+            // If no explicit script was provided via URL, try to attach the same
+            // auto-selected script we use from the Installed Apps flow.
+            if config.scriptData == nil, let bundle = config.bundleID,
+               let auto = autoScriptForBundleIfNeeded(bundleID: bundle) {
+                config.scriptData = auto.data
+                config.scriptName = auto.name
+            }
+
             if viewDidAppeared {
                 startJITInBackground(bundleID: config.bundleID, pid: config.pid, scriptData: config.scriptData, scriptName: config.scriptName, triggeredByURLScheme: true)
             } else {
@@ -664,6 +657,32 @@ struct HomeView: View {
         }
     }
 
+    private var systemAppsCard: some View {
+        homeCard {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("System Apps".localized)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text("Launch hidden system bundles without leaving Home.".localized)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                VStack(spacing: 10) {
+                    ForEach(systemPinnedItems) { item in
+                        SystemPinnedRow(
+                            item: item,
+                            accentColor: accentColor,
+                            isLaunching: launchingSystemApps.contains(item.bundleID),
+                            action: { launchSystemApp(item: item) },
+                            onRemove: { removePinnedSystemApp(bundleID: item.bundleID) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private var quickConnectItems: [QuickConnectItem] {
         var seen = Set<String>()
         var ordered: [QuickConnectItem] = []
@@ -673,6 +692,13 @@ struct HomeView: View {
             if ordered.count >= 4 { break }
         }
         return ordered
+    }
+
+    private var systemPinnedItems: [SystemPinnedItem] {
+        pinnedSystemApps.compactMap { bundleID in
+            let displayName = pinnedSystemAppNames[bundleID] ?? friendlyName(for: bundleID)
+            return SystemPinnedItem(bundleID: bundleID, displayName: displayName)
+        }
     }
 
     private func friendlyName(for bundleID: String) -> String {
@@ -953,6 +979,53 @@ struct HomeView: View {
             pipRequired = false
         }
     }
+
+    private func launchSystemApp(item: SystemPinnedItem) {
+        guard !launchingSystemApps.contains(item.bundleID) else { return }
+        launchingSystemApps.insert(item.bundleID)
+        HapticFeedbackHelper.trigger()
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let success = JITEnableContext.shared.launchAppWithoutDebug(item.bundleID, logger: nil)
+
+            DispatchQueue.main.async {
+                launchingSystemApps.remove(item.bundleID)
+                if success {
+                    LogManager.shared.addInfoLog("Launch request sent for \(item.bundleID)")
+                    systemLaunchMessage = String(format: "Launch requested: %@".localized, item.displayName)
+                } else {
+                    LogManager.shared.addErrorLog("Failed to launch \(item.bundleID)")
+                    systemLaunchMessage = String(format: "Failed to launch %@".localized, item.displayName)
+                }
+                scheduleSystemToastDismiss()
+            }
+        }
+    }
+
+    private func removePinnedSystemApp(bundleID: String) {
+        Haptics.light()
+        pinnedSystemApps.removeAll { $0 == bundleID }
+        pinnedSystemAppNames.removeValue(forKey: bundleID)
+        persistPinnedSystemApps()
+    }
+
+    private func scheduleSystemToastDismiss() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            if systemLaunchMessage != nil {
+                withAnimation {
+                    systemLaunchMessage = nil
+                }
+            }
+        }
+    }
+
+    private func persistPinnedSystemApps() {
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.stik.sj") {
+            sharedDefaults.set(pinnedSystemApps, forKey: "pinnedSystemApps")
+            sharedDefaults.set(pinnedSystemAppNames, forKey: "pinnedSystemAppNames")
+        }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
     
     private func addRecentPID(_ pid: Int) {
         var list = recentPIDs.filter { $0 != pid }
@@ -1156,6 +1229,71 @@ private struct QuickConnectRow: View {
     }
 }
 
+private struct SystemPinnedRow: View {
+    let item: SystemPinnedItem
+    let accentColor: Color
+    let isLaunching: Bool
+    var action: () -> Void
+    var onRemove: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                QuickAppBadge(title: item.displayName, accentColor: accentColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.displayName)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text(item.bundleID)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .textSelection(.enabled)
+                }
+
+                Spacer(minLength: 0)
+
+                if isLaunching {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(accentColor)
+                } else {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(accentColor)
+                }
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemBackground).opacity(0.6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isLaunching)
+        .contextMenu {
+            Button("Remove from Home".localized, systemImage: "star.slash") {
+                onRemove()
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                onRemove()
+            } label: {
+                Label("Remove".localized, systemImage: "trash")
+            }
+        }
+    }
+}
+
 private struct QuickAppBadge: View {
     let title: String
     let accentColor: Color
@@ -1227,6 +1365,12 @@ private struct ChecklistItem: Identifiable {
 }
 
 private struct QuickConnectItem: Identifiable {
+    let bundleID: String
+    let displayName: String
+    var id: String { bundleID }
+}
+
+private struct SystemPinnedItem: Identifiable {
     let bundleID: String
     let displayName: String
     var id: String { bundleID }
@@ -1448,5 +1592,41 @@ public extension ProcessInfo {
                 }) ?? false
             }
         }()
+    }
+}
+
+// MARK: - Auto script selection for URL and in-app flows
+
+private extension HomeView {
+    struct AutoScript {
+        let data: Data
+        let name: String
+    }
+
+    func autoScriptForBundleIfNeeded(bundleID: String) -> AutoScript? {
+        guard #available(iOS 26, *), ProcessInfo.processInfo.hasTXM else { return nil }
+        let appName: String? = {
+            let list = try? JITEnableContext.shared.getAppList()
+            return list?[bundleID]
+        }()
+
+        func load(resource: String, as name: String) -> AutoScript? {
+            guard let url = Bundle.main.url(forResource: resource, withExtension: "js"),
+                  let data = try? Data(contentsOf: url) else { return nil }
+            return AutoScript(data: data, name: name)
+        }
+
+        switch appName {
+        case "maciOS":
+            return load(resource: "script1", as: "script1.js")
+        case "Amethyst":
+            return load(resource: "script2", as: "script2.js")
+        case "MeloNX":
+            return load(resource: "melo", as: "melo.js")
+        case "UTM":
+            return load(resource: "utmjit", as: "utmjit.js")
+        default:
+            return nil
+        }
     }
 }
