@@ -34,10 +34,9 @@ struct InstalledAppsListView: View {
     @State private var launchingBundles: Set<String> = []
     @State private var launchFeedback: LaunchFeedback? = nil
     @State private var debuggableSearchText: String = ""
-    @State private var otherSearchText: String = ""
+    @State private var launchSearchText: String = ""
     @State private var prefetchedBundleIDs: Set<String> = []
     @State private var selectedTab: AppListTab = .debuggable
-    @State private var systemSearchText: String = ""
     @AppStorage("pinnedSystemApps") private var pinnedSystemApps: [String] = []
     @AppStorage("pinnedSystemAppNames") private var pinnedSystemAppNames: [String: String] = [:]
 
@@ -82,18 +81,48 @@ struct InstalledAppsListView: View {
         recentApps.filter { filteredDebuggableSet.contains($0) && !favoriteApps.contains($0) }
     }
 
+    // NEW: Combined Launch tab (System + Other/Non-Debuggable)
+    private var combinedLaunchApps: [String: String] {
+        // Prefer names from systemApps when duplicates exist
+        var combined = viewModel.nonDebuggableApps
+        for (k, v) in viewModel.systemApps {
+            combined[k] = v
+        }
+        return combined
+    }
+
+    private var sortedLaunchApps: [(key: String, value: String)] {
+        combinedLaunchApps.sorted { lhs, rhs in
+            let comparison = lhs.value.localizedCaseInsensitiveCompare(rhs.value)
+            if comparison == .orderedSame {
+                return lhs.key < rhs.key
+            }
+            return comparison == .orderedAscending
+        }
+    }
+
+    private var launchSearchIsActive: Bool {
+        !launchSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var filteredLaunchApps: [(key: String, value: String)] {
+        let base = sortedLaunchApps
+        guard launchSearchIsActive else { return base }
+        let query = normalizedSearchString(launchSearchText)
+        guard !query.isEmpty else { return base }
+        return base.filter { matches(query, bundleID: $0.key, name: $0.value) }
+    }
+
     private enum AppListTab: String, CaseIterable, Identifiable {
         case debuggable
-        case system
-        case other
+        case launch
 
         var id: String { rawValue }
 
         var title: String {
             switch self {
             case .debuggable: return "Debuggable"
-            case .system: return "System Apps"
-            case .other: return "Other"
+            case .launch: return "Launch"
             }
         }
     }
@@ -102,50 +131,6 @@ struct InstalledAppsListView: View {
         let id = UUID()
         let message: String
         let success: Bool
-    }
-
-    private var sortedOtherApps: [(key: String, value: String)] {
-        viewModel.nonDebuggableApps.sorted { lhs, rhs in
-            let comparison = lhs.value.localizedCaseInsensitiveCompare(rhs.value)
-            if comparison == .orderedSame {
-                return lhs.key < rhs.key
-            }
-            return comparison == .orderedAscending
-        }
-    }
-
-    private var sortedSystemApps: [(key: String, value: String)] {
-        viewModel.systemApps.sorted { lhs, rhs in
-            let comparison = lhs.value.localizedCaseInsensitiveCompare(rhs.value)
-            if comparison == .orderedSame {
-                return lhs.key < rhs.key
-            }
-            return comparison == .orderedAscending
-        }
-    }
-
-    private var otherSearchIsActive: Bool {
-        !otherSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var filteredOtherApps: [(key: String, value: String)] {
-        let base = sortedOtherApps
-        guard otherSearchIsActive else { return base }
-        let query = normalizedSearchString(otherSearchText)
-        guard !query.isEmpty else { return base }
-        return base.filter { matches(query, bundleID: $0.key, name: $0.value) }
-    }
-
-    private var systemSearchIsActive: Bool {
-        !systemSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var filteredSystemApps: [(key: String, value: String)] {
-        let base = sortedSystemApps
-        guard systemSearchIsActive else { return base }
-        let query = normalizedSearchString(systemSearchText)
-        guard !query.isEmpty else { return base }
-        return base.filter { matches(query, bundleID: $0.key, name: $0.value) }
     }
 
     private func normalizedSearchString(_ text: String) -> String {
@@ -165,10 +150,8 @@ struct InstalledAppsListView: View {
         switch tab {
         case .debuggable:
             return viewModel.debuggableApps.isEmpty
-        case .other:
-            return filteredOtherApps.isEmpty
-        case .system:
-            return filteredSystemApps.isEmpty
+        case .launch:
+            return filteredLaunchApps.isEmpty
         }
     }
 
@@ -275,6 +258,8 @@ struct InstalledAppsListView: View {
                 prefetchedBundleIDs.removeAll()
             } else {
                 prefetchPriorityIcons()
+                // Ensure names for existing favorites are persisted once app list is ready
+                persistIfChanged()
             }
         }
         .onChange(of: selectedTab) { _, _ in prefetchPriorityIcons() }
@@ -305,25 +290,13 @@ struct InstalledAppsListView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-            case .system:
-                Text("No Hidden System Apps".localized)
+            case .launch:
+                Text("No Launchable Apps".localized)
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(.primary)
 
                 Text("""
-                Hidden system apps appear here once CoreDevice exposes them. Try launching a bundle from the Other tab to surface background services.
-                """.localized)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            case .other:
-                Text("Nothing To Show".localized)
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                Text("""
-                Once your device pairing file is imported and CoreDevice is connected, every installed app will appear here for quick access.
+                Once your device pairing file is imported and CoreDevice is connected, all non‑debuggable and hidden system apps will appear here.
                 """.localized)
                 .font(.body)
                 .foregroundStyle(.secondary)
@@ -334,18 +307,7 @@ struct InstalledAppsListView: View {
         .padding(24)
         .glassCard(cornerRadius: 24, material: .thinMaterial, strokeOpacity: 0.12)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(emptyStateAccessibilityLabel(for: tab).localized)
-    }
-
-    private func emptyStateAccessibilityLabel(for tab: AppListTab) -> String {
-        switch tab {
-        case .debuggable:
-            return "No debuggable apps available"
-        case .system:
-            return "No hidden system apps available"
-        case .other:
-            return "No other apps available"
-        }
+        .accessibilityLabel(tab == .debuggable ? "No debuggable apps available" : "No launchable apps available")
     }
 
     // MARK: Apps List
@@ -434,8 +396,7 @@ struct InstalledAppsListView: View {
         appendUnique(recentApps)
         appendUnique(pinnedSystemApps)
         appendUnique(debuggableSortedApps.map { $0.key })
-        appendUnique(sortedSystemApps.map { $0.key })
-        appendUnique(sortedOtherApps.map { $0.key })
+        appendUnique(sortedLaunchApps.map { $0.key })
 
         let toPrefetch = priorityIDs.filter { !prefetchedBundleIDs.contains($0) }
         guard !toPrefetch.isEmpty else { return }
@@ -444,26 +405,8 @@ struct InstalledAppsListView: View {
         IconCache.shared.prefetchIcons(for: toPrefetch)
     }
 
-    private func otherSections(apps: [(key: String, value: String)]) -> some View {
-        glassSection(title: "Installed Apps".localized) {
-            LazyVStack(spacing: 12) {
-                ForEach(apps, id: \.key) { bundleID, appName in
-                    LaunchAppRow(
-                        bundleID: bundleID,
-                        appName: appName,
-                        isLaunching: launchingBundles.contains(bundleID),
-                        appIcons: $appIcons,
-                        performanceMode: performanceMode
-                    ) {
-                        startLaunching(bundleID: bundleID)
-                    }
-                }
-            }
-        }
-    }
-
-    private func systemSections(apps: [(key: String, value: String)]) -> some View {
-        glassSection(title: "Hidden System Apps".localized) {
+    private func launchSections(apps: [(key: String, value: String)]) -> some View {
+        glassSection(title: "Launchable Apps".localized) {
             LazyVStack(spacing: 12) {
                 ForEach(apps, id: \.key) { bundleID, appName in
                     let isPinned = pinnedSystemApps.contains(bundleID)
@@ -560,62 +503,30 @@ struct InstalledAppsListView: View {
                     .padding(.vertical, 24)
                 }
             }
-        case .system:
-            systemTabContent(apps: filteredSystemApps)
-        case .other:
-            otherTabContent(apps: filteredOtherApps)
-        }
-    }
+        case .launch:
+            ScrollView {
+                VStack(spacing: 18) {
+                    launchSearchBar
 
-    private func otherTabContent(apps: [(key: String, value: String)]) -> some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                searchBar
-
-                if let error = viewModel.lastError {
-                    errorBanner(error)
-                }
-
-                if apps.isEmpty {
-                    if otherSearchIsActive {
-                        otherSearchEmptyState
-                            .transition(.opacity.combined(with: .scale))
-                    } else {
-                        emptyState(for: .other)
-                            .transition(.opacity.combined(with: .scale))
+                    if let error = viewModel.lastError {
+                        errorBanner(error)
                     }
-                } else {
-                    otherSections(apps: apps)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 24)
-        }
-    }
 
-    private func systemTabContent(apps: [(key: String, value: String)]) -> some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                systemSearchBar
-
-                if let error = viewModel.lastError {
-                    errorBanner(error)
-                }
-
-                if apps.isEmpty {
-                    if systemSearchIsActive {
-                        systemSearchEmptyState
-                            .transition(.opacity.combined(with: .scale))
+                    if filteredLaunchApps.isEmpty {
+                        if launchSearchIsActive {
+                            launchSearchEmptyState
+                                .transition(.opacity.combined(with: .scale))
+                        } else {
+                            emptyState(for: .launch)
+                                .transition(.opacity.combined(with: .scale))
+                        }
                     } else {
-                        emptyState(for: .system)
-                            .transition(.opacity.combined(with: .scale))
+                        launchSections(apps: filteredLaunchApps)
                     }
-                } else {
-                    systemSections(apps: apps)
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 24)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 24)
         }
     }
 
@@ -668,7 +579,39 @@ struct InstalledAppsListView: View {
         .glassCard(cornerRadius: 20, material: .thinMaterial, strokeOpacity: 0.12)
     }
 
-    private var otherSearchEmptyState: some View {
+    private var launchSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search".localized, text: $launchSearchText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+
+            if launchSearchIsActive {
+                Button {
+                    launchSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Clear search".localized)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
+
+    private var launchSearchEmptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 44, weight: .regular))
@@ -678,87 +621,6 @@ struct InstalledAppsListView: View {
                 .font(.title3.weight(.semibold))
 
             Text("Try another name or bundle identifier.".localized)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .padding(24)
-        .glassCard(cornerRadius: 20, material: .thinMaterial, strokeOpacity: 0.12)
-    }
-
-    private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-
-            TextField("Search".localized, text: $otherSearchText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-
-            if !otherSearchText.isEmpty {
-                Button {
-                    otherSearchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityLabel("Clear search".localized)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(.white.opacity(0.08), lineWidth: 1)
-                )
-        )
-    }
-
-    private var systemSearchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-
-            TextField("Search system apps".localized, text: $systemSearchText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-
-            if !systemSearchText.isEmpty {
-                Button {
-                    systemSearchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityLabel("Clear search".localized)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(.white.opacity(0.08), lineWidth: 1)
-                )
-        )
-    }
-
-    private var systemSearchEmptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 44, weight: .regular))
-                .foregroundStyle(.secondary)
-
-            Text("No hidden matches".localized)
-                .font(.title3.weight(.semibold))
-
-            Text("Try another bundle identifier or internal process name.".localized)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -808,6 +670,7 @@ struct InstalledAppsListView: View {
         let prevF = (sharedDefaults.array(forKey: "favoriteApps") as? [String]) ?? []
         let prevPinned = (sharedDefaults.array(forKey: "pinnedSystemApps") as? [String]) ?? []
         let prevPinnedNames = (sharedDefaults.dictionary(forKey: "pinnedSystemAppNames") as? [String: String]) ?? [:]
+        let prevFavNames = (sharedDefaults.dictionary(forKey: "favoriteAppNames") as? [String: String]) ?? [:]
 
         if prevR != recentApps {
             sharedDefaults.set(recentApps, forKey: "recentApps")
@@ -825,6 +688,19 @@ struct InstalledAppsListView: View {
             sharedDefaults.set(pinnedSystemAppNames, forKey: "pinnedSystemAppNames")
             touched = true
         }
+
+        // Persist favorite names for the widget (prefer actual names from lists)
+        let computedFavNames: [String: String] = Dictionary(uniqueKeysWithValues: favoriteApps.map { id in
+            let name = viewModel.debuggableApps[id]
+                ?? combinedLaunchApps[id]
+                ?? fallbackReadableName(from: id)
+            return (id, name)
+        })
+        if prevFavNames != computedFavNames {
+            sharedDefaults.set(computedFavNames, forKey: "favoriteAppNames")
+            touched = true
+        }
+
         if touched { WidgetCenter.shared.reloadAllTimelines() }
     }
 
@@ -857,6 +733,7 @@ struct InstalledAppsListView: View {
         }
     }
 
+    // Pin/unpin any launchable app (not just hidden system)
     private func toggleSystemPin(bundleID: String, appName: String) {
         Haptics.light()
         if let index = pinnedSystemApps.firstIndex(of: bundleID) {
@@ -874,6 +751,17 @@ struct InstalledAppsListView: View {
             }
         }
         persistIfChanged()
+    }
+
+    // Fallback readable name from bundle identifier
+    private func fallbackReadableName(from bundleID: String) -> String {
+        let components = bundleID.split(separator: ".")
+        if let last = components.last {
+            let cleaned = last.replacingOccurrences(of: "_", with: " ")
+            let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed.capitalized }
+        }
+        return bundleID
     }
 }
 
@@ -1559,3 +1447,4 @@ class InstalledAppsViewModel: ObservableObject {
         }
     }
 }
+
