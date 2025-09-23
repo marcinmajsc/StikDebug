@@ -23,6 +23,7 @@ typedef void (^SyslogErrorHandler)(NSError *error);
 - (BOOL)debugAppWithPID:(int)pid logger:(LogFunc)logger jsCallback:(DebugAppCallback)jsCallback;
 - (NSDictionary<NSString*, NSString*>*)getAppListWithError:(NSError**)error;
 - (NSDictionary<NSString*, NSString*>*)getAllAppsWithError:(NSError**)error;
+- (NSDictionary<NSString*, NSString*>*)getHiddenSystemAppsWithError:(NSError**)error;
 - (UIImage*)getAppIconWithBundleId:(NSString*)bundleId error:(NSError**)error;
 - (BOOL)launchAppWithoutDebug:(NSString*)bundleID logger:(LogFunc)logger;
 - (void)startSyslogRelayWithHandler:(SyslogLineHandler)lineHandler

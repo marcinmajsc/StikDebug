@@ -28,12 +28,16 @@ struct InstalledAppsListView: View {
         }
     }
 
+    @AppStorage("loadAppIconsOnJIT") private var loadAppIconsOnJIT = true
     @AppStorage("performanceMode") private var performanceMode = false
     @State private var showPerformanceToast = false
     @State private var launchingBundles: Set<String> = []
     @State private var launchFeedback: LaunchFeedback? = nil
     @State private var debuggableSearchText: String = ""
     @State private var otherSearchText: String = ""
+    @State private var prefetchedBundleIDs: Set<String> = []
+    @State private var selectedTab: AppListTab = .debuggable
+    @State private var systemSearchText: String = ""
 
     @Environment(\.dismiss) private var dismiss
     var onSelectApp: (String) -> Void
@@ -78,6 +82,7 @@ struct InstalledAppsListView: View {
 
     private enum AppListTab: String, CaseIterable, Identifiable {
         case debuggable
+        case system
         case other
 
         var id: String { rawValue }
@@ -85,6 +90,7 @@ struct InstalledAppsListView: View {
         var title: String {
             switch self {
             case .debuggable: return "Debuggable"
+            case .system: return "System Apps"
             case .other: return "Other"
             }
         }
@@ -106,6 +112,16 @@ struct InstalledAppsListView: View {
         }
     }
 
+    private var sortedSystemApps: [(key: String, value: String)] {
+        viewModel.systemApps.sorted { lhs, rhs in
+            let comparison = lhs.value.localizedCaseInsensitiveCompare(rhs.value)
+            if comparison == .orderedSame {
+                return lhs.key < rhs.key
+            }
+            return comparison == .orderedAscending
+        }
+    }
+
     private var otherSearchIsActive: Bool {
         !otherSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -114,6 +130,18 @@ struct InstalledAppsListView: View {
         let base = sortedOtherApps
         guard otherSearchIsActive else { return base }
         let query = normalizedSearchString(otherSearchText)
+        guard !query.isEmpty else { return base }
+        return base.filter { matches(query, bundleID: $0.key, name: $0.value) }
+    }
+
+    private var systemSearchIsActive: Bool {
+        !systemSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var filteredSystemApps: [(key: String, value: String)] {
+        let base = sortedSystemApps
+        guard systemSearchIsActive else { return base }
+        let query = normalizedSearchString(systemSearchText)
         guard !query.isEmpty else { return base }
         return base.filter { matches(query, bundleID: $0.key, name: $0.value) }
     }
@@ -137,6 +165,8 @@ struct InstalledAppsListView: View {
             return viewModel.debuggableApps.isEmpty
         case .other:
             return filteredOtherApps.isEmpty
+        case .system:
+            return filteredSystemApps.isEmpty
         }
     }
 
@@ -232,6 +262,20 @@ struct InstalledAppsListView: View {
             }
         }
         .preferredColorScheme(preferredScheme)
+        .onAppear {
+            prefetchedBundleIDs.removeAll()
+            prefetchPriorityIcons()
+        }
+        .onChange(of: favoriteApps) { _, _ in prefetchPriorityIcons() }
+        .onChange(of: recentApps) { _, _ in prefetchPriorityIcons() }
+        .onChange(of: viewModel.isLoading) { _, newValue in
+            if newValue {
+                prefetchedBundleIDs.removeAll()
+            } else {
+                prefetchPriorityIcons()
+            }
+        }
+        .onChange(of: selectedTab) { _, _ in prefetchPriorityIcons() }
     }
 
     // MARK: Empty State
@@ -258,6 +302,18 @@ struct InstalledAppsListView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
+            case .system:
+                Text("No Hidden System Apps".localized)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text("""
+                Hidden system apps appear here once CoreDevice exposes them. Try launching a bundle from the Other tab to surface background services.
+                """.localized)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
             case .other:
                 Text("Nothing To Show".localized)
                     .font(.title2.weight(.semibold))
@@ -275,7 +331,18 @@ struct InstalledAppsListView: View {
         .padding(24)
         .glassCard(cornerRadius: 24, material: .thinMaterial, strokeOpacity: 0.12)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Empty list. Import pairing file or sign app appropriately.".localized)
+        .accessibilityLabel(emptyStateAccessibilityLabel(for: tab).localized)
+    }
+
+    private func emptyStateAccessibilityLabel(for tab: AppListTab) -> String {
+        switch tab {
+        case .debuggable:
+            return "No debuggable apps available"
+        case .system:
+            return "No hidden system apps available"
+        case .other:
+            return "No other apps available"
+        }
     }
 
     // MARK: Apps List
@@ -345,36 +412,84 @@ struct InstalledAppsListView: View {
         }
     }
 
-    private func otherSections(apps: [(key: String, value: String)]) -> some View {
-        VStack(spacing: 18) {
-            glassSection(title: "How It Works".localized) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Launch apps without get-task-allow by tunneling through CoreDevice. This only starts the app; attach debugging from Recents once it exposes get-task-allow.".localized)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
+    private func prefetchPriorityIcons(limit: Int = 32) {
+        guard loadAppIconsOnJIT else { return }
 
-            glassSection(title: "All Installed Apps".localized) {
-                LazyVStack(spacing: 12) {
-                    ForEach(apps, id: \.key) { bundleID, appName in
-                        LaunchAppRow(
-                            bundleID: bundleID,
-                            appName: appName,
-                            isLaunching: launchingBundles.contains(bundleID),
-                            appIcons: $appIcons,
-                            performanceMode: performanceMode
-                        ) {
-                            startLaunching(bundleID: bundleID)
-                        }
+        var priorityIDs: [String] = []
+        var seen = Set<String>()
+
+        func appendUnique<S: Sequence>(_ ids: S) where S.Element == String {
+            guard priorityIDs.count < limit else { return }
+            for id in ids {
+                guard seen.insert(id).inserted else { continue }
+                priorityIDs.append(id)
+                if priorityIDs.count >= limit { break }
+            }
+        }
+
+        appendUnique(favoriteApps)
+        appendUnique(recentApps)
+        appendUnique(debuggableSortedApps.map { $0.key })
+        appendUnique(sortedSystemApps.map { $0.key })
+        appendUnique(sortedOtherApps.map { $0.key })
+
+        let toPrefetch = priorityIDs.filter { !prefetchedBundleIDs.contains($0) }
+        guard !toPrefetch.isEmpty else { return }
+
+        prefetchedBundleIDs.formUnion(toPrefetch)
+        IconCache.shared.prefetchIcons(for: toPrefetch)
+    }
+
+    private func otherSections(apps: [(key: String, value: String)]) -> some View {
+        glassSection(title: "Installed Apps".localized) {
+            LazyVStack(spacing: 12) {
+                ForEach(apps, id: \.key) { bundleID, appName in
+                    LaunchAppRow(
+                        bundleID: bundleID,
+                        appName: appName,
+                        isLaunching: launchingBundles.contains(bundleID),
+                        appIcons: $appIcons,
+                        performanceMode: performanceMode
+                    ) {
+                        startLaunching(bundleID: bundleID)
                     }
                 }
             }
         }
     }
 
+    private func systemSections(apps: [(key: String, value: String)]) -> some View {
+        glassSection(title: "Hidden System Apps".localized) {
+            LazyVStack(spacing: 12) {
+                ForEach(apps, id: \.key) { bundleID, appName in
+                    LaunchAppRow(
+                        bundleID: bundleID,
+                        appName: appName,
+                        isLaunching: launchingBundles.contains(bundleID),
+                        appIcons: $appIcons,
+                        performanceMode: performanceMode
+                    ) {
+                        startLaunching(bundleID: bundleID)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private var tabbedContent: some View {
-        tabContent(for: .debuggable)
+        VStack(spacing: 14) {
+            Picker("", selection: $selectedTab) {
+                ForEach(AppListTab.allCases) { tab in
+                    Text(tab.title.localized)
+                        .tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+
+            tabContent(for: selectedTab)
+        }
     }
 
     @ViewBuilder
@@ -415,6 +530,8 @@ struct InstalledAppsListView: View {
                     .padding(.vertical, 24)
                 }
             }
+        case .system:
+            systemTabContent(apps: filteredSystemApps)
         case .other:
             otherTabContent(apps: filteredOtherApps)
         }
@@ -439,6 +556,32 @@ struct InstalledAppsListView: View {
                     }
                 } else {
                     otherSections(apps: apps)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+        }
+    }
+
+    private func systemTabContent(apps: [(key: String, value: String)]) -> some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                systemSearchBar
+
+                if let error = viewModel.lastError {
+                    errorBanner(error)
+                }
+
+                if apps.isEmpty {
+                    if systemSearchIsActive {
+                        systemSearchEmptyState
+                            .transition(.opacity.combined(with: .scale))
+                    } else {
+                        emptyState(for: .system)
+                            .transition(.opacity.combined(with: .scale))
+                    }
+                } else {
+                    systemSections(apps: apps)
                 }
             }
             .padding(.horizontal, 20)
@@ -542,6 +685,55 @@ struct InstalledAppsListView: View {
                         .stroke(.white.opacity(0.08), lineWidth: 1)
                 )
         )
+    }
+
+    private var systemSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search system apps".localized, text: $systemSearchText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+
+            if !systemSearchText.isEmpty {
+                Button {
+                    systemSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Clear search".localized)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
+
+    private var systemSearchEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 44, weight: .regular))
+                .foregroundStyle(.secondary)
+
+            Text("No hidden matches".localized)
+                .font(.title3.weight(.semibold))
+
+            Text("Try another bundle identifier or internal process name.".localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .padding(24)
+        .glassCard(cornerRadius: 20, material: .thinMaterial, strokeOpacity: 0.12)
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -818,7 +1010,8 @@ struct AppButton: View {
 
     private func loadAppIcon(for bundleID: String) {
         guard loadAppIconsOnJIT else { return }
-        IconCache.shared.fetchIcon(for: bundleID) { image in
+        guard appIcons[bundleID] == nil else { return }
+        IconCache.shared.fetchIcon(for: bundleID, priority: .veryHigh) { image in
             guard let image else { return }
             let shouldAnimate = appIcons[bundleID] == nil
             if shouldAnimate {
@@ -934,7 +1127,9 @@ struct LaunchAppRow: View {
     }
 
     private func loadAppIcon(for bundleID: String) {
-        IconCache.shared.fetchIcon(for: bundleID) { image in
+        guard loadAppIconsOnJIT else { return }
+        guard appIcons[bundleID] == nil else { return }
+        IconCache.shared.fetchIcon(for: bundleID, priority: .veryHigh) { image in
             guard let image else { return }
             let shouldAnimate = appIcons[bundleID] == nil
             if shouldAnimate {
@@ -1024,6 +1219,7 @@ final class IconCache {
     private let queue = OperationQueue()
     private let callbackQueue = DispatchQueue(label: "com.stik.iconcache.callbacks")
     private var pendingCallbacks: [String: [(UIImage?) -> Void]] = [:]
+    private var pendingOperations: [String: Operation] = [:]
 
     private init() {
         queue.maxConcurrentOperationCount = 4
@@ -1032,7 +1228,11 @@ final class IconCache {
         mem.totalCostLimit = 64 * 1024 * 1024
     }
 
-    func fetchIcon(for bundleID: String, completion: @escaping (UIImage?) -> Void) {
+    func fetchIcon(
+        for bundleID: String,
+        priority: Operation.QueuePriority = .normal,
+        completion: @escaping (UIImage?) -> Void
+    ) {
         if let memImage = mem.object(forKey: bundleID as NSString) {
             DispatchQueue.main.async { completion(memImage) }
             return
@@ -1043,6 +1243,9 @@ final class IconCache {
             if var existing = pendingCallbacks[bundleID] {
                 existing.append(completion)
                 pendingCallbacks[bundleID] = existing
+                if let op = pendingOperations[bundleID], op.queuePriority.rawValue < priority.rawValue {
+                    op.queuePriority = priority
+                }
             } else {
                 pendingCallbacks[bundleID] = [completion]
                 shouldStartLoad = true
@@ -1051,7 +1254,7 @@ final class IconCache {
 
         guard shouldStartLoad else { return }
 
-        queue.addOperation { [weak self] in
+        let operation = BlockOperation { [weak self] in
             guard let self else { return }
 
             var loadedFromDisk = false
@@ -1070,22 +1273,39 @@ final class IconCache {
             }
 
             if let image = result {
-                let cost = Int(image.size.width * image.size.height * image.scale * image.scale)
-                self.mem.setObject(image, forKey: bundleID as NSString, cost: cost)
+                let prepared = self.prepareForDisplay(image)
+                let cost = Int(prepared.size.width * prepared.size.height * prepared.scale * prepared.scale)
+                self.mem.setObject(prepared, forKey: bundleID as NSString, cost: cost)
                 if !loadedFromDisk {
-                    saveIconToGroup(image, bundleID: bundleID)
+                    saveIconToGroup(prepared, bundleID: bundleID)
                 }
+                result = prepared
             }
 
             let callbacks = self.callbackQueue.sync { () -> [(UIImage?) -> Void] in
                 let handlers = self.pendingCallbacks[bundleID] ?? []
                 self.pendingCallbacks[bundleID] = nil
+                self.pendingOperations[bundleID] = nil
                 return handlers
             }
 
             DispatchQueue.main.async {
                 callbacks.forEach { $0(result) }
             }
+        }
+        operation.queuePriority = priority
+
+        callbackQueue.sync {
+            pendingOperations[bundleID] = operation
+        }
+
+        queue.addOperation(operation)
+    }
+
+    func prefetchIcons(for bundleIDs: [String]) {
+        let uniqueIDs = Set(bundleIDs)
+        for bundleID in uniqueIDs {
+            fetchIcon(for: bundleID, priority: .veryLow) { _ in }
         }
     }
 
@@ -1097,7 +1317,25 @@ final class IconCache {
         let iconsDir = containerURL.appendingPathComponent("icons", isDirectory: true)
         let fileURL = iconsDir.appendingPathComponent("\(bundleID).png")
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
-        return UIImage(contentsOfFile: fileURL.path)
+
+        guard let data = try? Data(contentsOf: fileURL) else {
+            try? FileManager.default.removeItem(at: fileURL)
+            return nil
+        }
+
+        if let image = UIImage(data: data, scale: UIScreen.main.scale) {
+            return image
+        }
+
+        try? FileManager.default.removeItem(at: fileURL)
+        return nil
+    }
+
+    private func prepareForDisplay(_ image: UIImage) -> UIImage {
+        if #available(iOS 15.0, *) {
+            return image.preparingForDisplay() ?? image
+        }
+        return image
     }
 }
 
@@ -1184,6 +1422,7 @@ extension Array: @retroactive RawRepresentable where Element: Codable {
 class InstalledAppsViewModel: ObservableObject {
     @Published var debuggableApps: [String: String] = [:]
     @Published var nonDebuggableApps: [String: String] = [:]
+    @Published var systemApps: [String: String] = [:]
     @Published var isLoading = false
     @Published var lastError: String? = nil
 
@@ -1200,19 +1439,35 @@ class InstalledAppsViewModel: ObservableObject {
             do {
                 let debuggable = try JITEnableContext.shared.getAppList()
                 let allApps = try JITEnableContext.shared.getAllApps()
+                let hiddenSystem = (try? JITEnableContext.shared.getHiddenSystemApps()) ?? [:]
 
                 let nonDebuggableSequence = allApps.filter { debuggable[$0.key] == nil }
-                let nonDebuggable = Dictionary(uniqueKeysWithValues: nonDebuggableSequence.map { ($0.key, $0.value) })
+                var nonDebuggable: [String: String] = [:]
+                var system: [String: String] = [:]
+
+                for (bundle, name) in nonDebuggableSequence {
+                    if let hiddenName = hiddenSystem[bundle] {
+                        system[bundle] = hiddenName
+                    } else {
+                        nonDebuggable[bundle] = name
+                    }
+                }
+
+                for (bundle, name) in hiddenSystem where system[bundle] == nil && debuggable[bundle] == nil {
+                    system[bundle] = name
+                }
 
                 DispatchQueue.main.async {
                     self.debuggableApps = debuggable
                     self.nonDebuggableApps = nonDebuggable
+                    self.systemApps = system
                     self.isLoading = false
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.debuggableApps = [:]
                     self.nonDebuggableApps = [:]
+                    self.systemApps = [:]
                     self.isLoading = false
                     self.lastError = error.localizedDescription
                     print("Failed to load apps: \(error)")

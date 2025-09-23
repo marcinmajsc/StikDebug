@@ -31,6 +31,9 @@ struct HomeView: View {
     @State private var isShowingInstalledApps = false
     @State private var isShowingPairingFilePicker = false
     @State private var pairingFileExists: Bool = false
+    @State private var pairingFilePresentOnDisk: Bool = false
+    @State private var isValidatingPairingFile = false
+    @State private var lastValidatedPairingSignature: PairingFileSignature? = nil
     @State private var showPairingFileMessage = false
     @State private var pairingFileIsValid = false
     @State private var isImportingFile = false
@@ -58,7 +61,7 @@ struct HomeView: View {
     @State private var isLoadingQuickApps = false
 
     @AppStorage("showiOS26Disclaimer") private var showiOS26Disclaimer: Bool = true
-    
+
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
     @Environment(\.themeExpansionManager) private var themeExpansion
     private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
@@ -70,6 +73,8 @@ struct HomeView: View {
 
     private var ddiMounted: Bool { isMounted() }
     private var canConnectByApp: Bool { pairingFileExists && ddiMounted }
+
+    private let pairingFileURL = URL.documentsDirectory.appendingPathComponent("pairingFile.plist")
     
     private var isOnOrAfteriOS26: Bool {
         let v = ProcessInfo.processInfo.operatingSystemVersion
@@ -351,9 +356,13 @@ struct HomeView: View {
 
                 VStack(spacing: 10) {
                     Button(action: primaryActionTapped) {
-                        whiteCardButtonLabel(icon: primaryActionIcon, title: primaryActionTitle, isLoading: isProcessing)
+                        whiteCardButtonLabel(
+                            icon: primaryActionIcon,
+                            title: primaryActionTitle,
+                            isLoading: isProcessing || isValidatingPairingFile
+                        )
                     }
-                    .disabled(isProcessing)
+                    .disabled(isProcessing || isValidatingPairingFile)
 
                     if pairingFileExists && enableAdvancedOptions {
                         Button(action: { showPIDSheet = true }) {
@@ -373,7 +382,23 @@ struct HomeView: View {
     }
 
     private var readinessSummary: ReadinessSummary {
+        if isValidatingPairingFile {
+            return .init(
+                title: "Validating pairing file",
+                subtitle: "Hang tight while we verify the pairing file from your trusted computer.",
+                icon: "hourglass.circle.fill",
+                tint: .orange
+            )
+        }
         if !pairingFileExists {
+            if pairingFilePresentOnDisk {
+                return .init(
+                    title: "Pairing file needs attention",
+                    subtitle: "We found a pairing file but couldn’t read it. Re-import it from your trusted computer.",
+                    icon: "doc.badge.exclamationmark",
+                    tint: .yellow
+                )
+            }
             return .init(
                 title: "Import your pairing file",
                 subtitle: "Grab the pairing file from your computer to unlock app discovery.",
@@ -414,28 +439,59 @@ struct HomeView: View {
     }
 
     private var primaryActionTitle: String {
-        if !pairingFileExists { return "Import Pairing File" }
+        if isValidatingPairingFile { return "Validating…" }
+        if !pairingFileExists { return pairingFilePresentOnDisk ? "Re-import Pairing File" : "Import Pairing File" }
         if !ddiMounted { return "Mount Developer Disk Image" }
         return "Connect by App"
     }
 
     private var primaryActionIcon: String {
-        if !pairingFileExists { return "doc.badge.plus" }
+        if isValidatingPairingFile { return "hourglass" }
+        if !pairingFileExists { return pairingFilePresentOnDisk ? "arrow.clockwise" : "doc.badge.plus" }
         if !ddiMounted { return "externaldrive" }
         return "cable.connector.horizontal"
     }
 
     private var readinessChecklist: [ChecklistItem] {
         let vpnConnected = tunnel.tunnelStatus == .connected
+        let pairingItem: ChecklistItem
+
+        if isValidatingPairingFile {
+            pairingItem = ChecklistItem(
+                title: "Pairing file",
+                subtitle: "Validating pairing file…",
+                status: .waiting,
+                actionTitle: nil,
+                action: nil
+            )
+        } else if pairingFileExists {
+            pairingItem = ChecklistItem(
+                title: "Pairing file",
+                subtitle: "Imported and valid.",
+                status: .ready,
+                actionTitle: nil,
+                action: nil
+            )
+        } else if pairingFilePresentOnDisk {
+            pairingItem = ChecklistItem(
+                title: "Pairing file",
+                subtitle: "We couldn’t read the pairing file that’s on disk. Re-import it from your trusted computer.",
+                status: .attention,
+                actionTitle: "Re-import",
+                action: { isShowingPairingFilePicker = true }
+            )
+        } else {
+            pairingItem = ChecklistItem(
+                title: "Pairing file",
+                subtitle: "Import the pairing file generated from your trusted computer.",
+                status: .actionRequired,
+                actionTitle: "Import",
+                action: { isShowingPairingFilePicker = true }
+            )
+        }
 
         return [
-            ChecklistItem(
-                title: "Pairing file",
-                subtitle: pairingFileExists ? "Imported and valid." : "Import the pairing file generated from your trusted computer.",
-                status: pairingFileExists ? .ready : .actionRequired,
-                actionTitle: pairingFileExists ? nil : "Import",
-                action: pairingFileExists ? nil : { isShowingPairingFilePicker = true }
-            ),
+            pairingItem,
             ChecklistItem(
                 title: "Developer Disk Image",
                 subtitle: ddiMounted ? "Mounted successfully." : "Open Settings → Developer Disk Image and tap Mount.",
@@ -755,6 +811,7 @@ struct HomeView: View {
     }
 
     private func primaryActionTapped() {
+        guard !isValidatingPairingFile else { return }
         if pairingFileExists {
             if !ddiMounted {
                 showAlert(title: "Device Not Mounted".localized, message: "The Developer Disk Image has not been mounted yet. Check in settings for more information.".localized, showOk: true) { _ in }
@@ -790,8 +847,43 @@ struct HomeView: View {
     }
     
     private func checkPairingFileExists() {
-        let fileExists = FileManager.default.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path)
-        pairingFileExists = fileExists && isPairing()
+        let fileExists = FileManager.default.fileExists(atPath: pairingFileURL.path)
+        pairingFilePresentOnDisk = fileExists
+
+        guard fileExists else {
+            pairingFileExists = false
+            lastValidatedPairingSignature = nil
+            isValidatingPairingFile = false
+            return
+        }
+
+        let signature = pairingFileSignature(for: pairingFileURL)
+
+        guard needsValidation(for: signature) else { return }
+        guard !isValidatingPairingFile else { return }
+
+        isValidatingPairingFile = true
+
+        DispatchQueue.global(qos: .utility).async {
+            let valid = isPairing()
+            DispatchQueue.main.async {
+                pairingFileExists = valid
+                lastValidatedPairingSignature = signature
+                isValidatingPairingFile = false
+            }
+        }
+    }
+
+    private func needsValidation(for signature: PairingFileSignature) -> Bool {
+        guard let lastSignature = lastValidatedPairingSignature else { return true }
+        return lastSignature != signature
+    }
+
+    private func pairingFileSignature(for url: URL) -> PairingFileSignature {
+        let attributes = (try? FileManager.default.attributesOfItem(atPath: url.path)) ?? [:]
+        let modificationDate = attributes[.modificationDate] as? Date
+        let sizeValue = (attributes[.size] as? NSNumber)?.uint64Value ?? 0
+        return PairingFileSignature(modificationDate: modificationDate, fileSize: sizeValue)
     }
     private func refreshBackground() { }
     
@@ -1093,6 +1185,11 @@ private struct ReadinessSummary {
     let subtitle: String
     let icon: String
     let tint: Color
+}
+
+private struct PairingFileSignature: Equatable {
+    let modificationDate: Date?
+    let fileSize: UInt64
 }
 
 private enum ChecklistStatus {

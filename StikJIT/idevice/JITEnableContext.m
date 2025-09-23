@@ -203,6 +203,22 @@ JITEnableContext* sharedJITContext = nil;
     return apps;
 }
 
+- (NSDictionary<NSString*, NSString*>*)getHiddenSystemAppsWithError:(NSError**)error {
+    if (!provider) {
+        NSLog(@"Provider not initialized!");
+        *error = [self errorWithStr:@"Provider not initialized!" code:-1];
+        return nil;
+    }
+
+    NSString* errorStr = nil;
+    NSDictionary<NSString*, NSString*>* apps = list_hidden_system_apps(provider, &errorStr);
+    if (errorStr) {
+        *error = [self errorWithStr:errorStr code:-17];
+        return nil;
+    }
+    return apps;
+}
+
 - (UIImage*)getAppIconWithBundleId:(NSString*)bundleId error:(NSError**)error {
     if (!provider) {
         NSLog(@"Provider not initialized!");
