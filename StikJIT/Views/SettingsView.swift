@@ -17,20 +17,22 @@ struct SettingsView: View {
     @AppStorage("enablePiP") private var enablePiP = false
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
-    private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
+    @Environment(\.themeExpansionManager) private var themeExpansion
+    private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
+    private var preferredScheme: ColorScheme? { themeExpansion?.preferredColorScheme(for: appThemeRaw) }
     
     @State private var isShowingPairingFilePicker = false
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var showIconPopover = false
     @State private var showPairingFileMessage = false
-    @State private var pairingFileIsValid = false
     @State private var isImportingFile = false
     @State private var importProgress: Float = 0.0
+    @State private var pairingStatusMessage: String? = nil
+    @State private var showRemovePairingFileDialog = false
     @State private var is_lc = false
     @State private var showColorPickerPopup = false
-    
-    @State private var showingConsoleLogsView = false
+
     @State private var showingDisplayView = false
     
     private var appVersion: String {
@@ -39,8 +41,15 @@ struct SettingsView: View {
     }
     
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty { return .white }
-        return Color(hex: customAccentColorHex) ?? .white
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
+    }
+
+    private var currentThemeName: String {
+        AppTheme(rawValue: appThemeRaw)?.displayName ?? "Default"
+    }
+
+    private var accentColorDescription: String {
+        customAccentColorHex.isEmpty ? "System Blue" : customAccentColorHex.uppercased()
     }
     // Developer profile image URLs
     private let developerProfiles: [String: String] = [
@@ -57,7 +66,7 @@ struct SettingsView: View {
         NavigationStack {
             ZStack {
                 // Subtle depth gradient background
-                ThemedBackground(style: currentTheme.backgroundStyle)
+                ThemedBackground(style: backgroundStyle)
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -112,10 +121,12 @@ struct SettingsView: View {
                 }
                 
                 // Success toast after import
-                if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
+                if let pairingStatusMessage,
+                   showPairingFileMessage,
+                   !isImportingFile {
                     VStack {
                         Spacer()
-                        Text("✓ Pairing file successfully imported")
+                        Text(pairingStatusMessage)
                             .font(.footnote.weight(.semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -130,8 +141,9 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
         }
-        // Force a white tint in Settings, overriding any global/user tint
-        .tint(Color.white)
+        // Match controls to the active accent color (defaults to blue)
+        .tint(accentColor)
+        .preferredColorScheme(preferredScheme)
         .fileImporter(
             isPresented: $isShowingPairingFilePicker,
             allowedContentTypes: [UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data)!, .propertyList],
@@ -156,7 +168,8 @@ struct SettingsView: View {
                         DispatchQueue.main.async {
                             isImportingFile = true
                             importProgress = 0.0
-                            pairingFileIsValid = false
+                            pairingStatusMessage = nil
+                            showPairingFileMessage = false
                         }
                         
                         let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
@@ -166,17 +179,6 @@ struct SettingsView: View {
                                 } else {
                                     timer.invalidate()
                                     isImportingFile = false
-                                    pairingFileIsValid = true
-                                    
-                                    withAnimation {
-                                        showPairingFileMessage = true
-                                    }
-                                    
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                        withAnimation {
-                                            showPairingFileMessage = false
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -198,7 +200,6 @@ struct SettingsView: View {
                 print("Failed to import file: \(error)")
             }
         }
-        .preferredColorScheme(.dark)
     }
     
     // MARK: - Cards
@@ -228,17 +229,38 @@ struct SettingsView: View {
     
     private var appearanceCard: some View {
         glassCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("Appearance")
                     .font(.headline)
                     .foregroundColor(.primary)
-                
+
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(accentColor)
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(currentThemeName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
+                        Text("Accent · \(accentColorDescription)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+
                 Button(action: { showingDisplayView = true }) {
                     HStack {
                         Image(systemName: "paintbrush")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.85))
-                        Text("Display")
+                        Text("Customize Display")
                             .foregroundColor(.primary.opacity(0.85))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -251,8 +273,11 @@ struct SettingsView: View {
             .padding(4)
         }
         .sheet(isPresented: $showingDisplayView) {
-            DisplayView()
-                .preferredColorScheme(.dark)
+            if let manager = themeExpansion {
+                DisplayView().themeExpansionManager(manager)
+            } else {
+                DisplayView()
+            }
         }
     }
     
@@ -282,7 +307,7 @@ struct SettingsView: View {
                     )
                 }
                 
-                if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
+                if showPairingFileMessage && !isImportingFile {
                     HStack {
                         Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
                         Text("Pairing file successfully imported")
@@ -332,21 +357,6 @@ struct SettingsView: View {
                     .font(.headline)
                     .foregroundColor(.primary)
                 
-                Button(action: { showingConsoleLogsView = true }) {
-                    HStack {
-                        Image(systemName: "terminal")
-                            .font(.system(size: 18))
-                            .foregroundColor(.primary.opacity(0.8))
-                        Text("System Logs")
-                            .foregroundColor(.primary.opacity(0.8))
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.vertical, 8)
-                }
-                
                 Button(action: { openAppFolder() }) {
                     HStack {
                         Image(systemName: "folder")
@@ -362,10 +372,6 @@ struct SettingsView: View {
                     .padding(.vertical, 8)
                 }
             }
-        }
-        .sheet(isPresented: $showingConsoleLogsView) {
-            ConsoleLogsView()
-                .preferredColorScheme(.dark)
         }
     }
     
@@ -549,14 +555,13 @@ struct LinkRow: View {
             }
         }
         .padding(.vertical, 8)
-        .preferredColorScheme(.dark)
     }
 }
 
 struct ConsoleLogsView_Preview: PreviewProvider {
     static var previews: some View {
         ConsoleLogsView()
-            .preferredColorScheme(.dark)
+            .themeExpansionManager(ThemeExpansionManager(previewUnlocked: true))
     }
 }
 

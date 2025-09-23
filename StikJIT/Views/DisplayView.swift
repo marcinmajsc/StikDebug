@@ -74,44 +74,56 @@ struct DisplayView: View {
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
     @AppStorage("loadAppIconsOnJIT") private var loadAppIconsOnJIT = true
-    @State private var selectedAccentColor: Color = .white
+    @State private var selectedAccentColor: Color = .blue
     @Environment(\.colorScheme) private var colorScheme
-    
+    @Environment(\.themeExpansionManager) private var themeExpansionOptional
+
     @State private var justSaved = false
-    
+    @State private var showingCreateCustomTheme = false
+    @State private var editingCustomTheme: CustomTheme?
+
+    private var themeExpansion: ThemeExpansionManager? { themeExpansionOptional }
+
+    private var hasThemeExpansion: Bool { themeExpansion?.hasThemeExpansion == true }
+
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty {
-            return .white
-        } else {
-            return Color(hex: customAccentColorHex) ?? .white
-        }
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
     }
-    
-    private var selectedTheme: AppTheme {
-        get { AppTheme(rawValue: appThemeRaw) ?? .system }
-        set { appThemeRaw = newValue.rawValue }
+
+    private var tintColor: Color {
+        hasThemeExpansion ? selectedAccentColor : .blue
     }
-    
-    private var hardcodedGradient: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(UIColor.systemBackground),
-                Color(UIColor.secondarySystemBackground)
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+
+    private var selectedThemeIdentifier: String { appThemeRaw }
+
+    private var selectedBuiltInTheme: AppTheme? {
+        AppTheme(rawValue: selectedThemeIdentifier)
+    }
+
+    private var selectedCustomTheme: CustomTheme? {
+        themeExpansion?.customTheme(for: selectedThemeIdentifier)
+    }
+
+    private var backgroundStyle: BackgroundStyle {
+        themeExpansion?.backgroundStyle(for: selectedThemeIdentifier) ?? AppTheme.system.backgroundStyle
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                hardcodedGradient.ignoresSafeArea()
+                ThemedBackground(style: backgroundStyle)
+                    .ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 20) {
                         usernameCard
-                        accentCard
+                        if hasThemeExpansion {
+                            accentCard
+                            themeCard
+                            customThemesSection
+                        } else {
+                            themeExpansionUpsellCard
+                        }
                         jitOptionsCard
                     }
                     .padding(.horizontal, 20)
@@ -136,11 +148,61 @@ struct DisplayView: View {
             }
             .navigationTitle("Display")
             .onAppear {
+                if !hasThemeExpansion, let manager = themeExpansion, manager.isCustomThemeIdentifier(appThemeRaw) {
+                    appThemeRaw = AppTheme.system.rawValue
+                }
                 loadCustomAccentColor()
-                applyTheme(selectedTheme)
+                applyThemePreferences()
+            }
+            .onChange(of: appThemeRaw) { _, newValue in
+                guard hasThemeExpansion, let manager = themeExpansion else { return }
+                if manager.isCustomThemeIdentifier(newValue), manager.customTheme(for: newValue) == nil {
+                    appThemeRaw = AppTheme.system.rawValue
+                }
+                applyThemePreferences()
+            }
+            .onChange(of: themeExpansion?.hasThemeExpansion ?? false) { unlocked in
+                if unlocked {
+                    loadCustomAccentColor()
+                    applyThemePreferences()
+                } else {
+                    selectedAccentColor = .blue
+                    appThemeRaw = AppTheme.system.rawValue
+                    applyThemePreferences()
+                }
             }
         }
-        .tint(selectedAccentColor)
+        .tint(tintColor)
+        .sheet(isPresented: $showingCreateCustomTheme) {
+            CustomThemeEditorView(initialTheme: nil) { newTheme in
+                themeExpansion?.upsert(customTheme: newTheme)
+                if let manager = themeExpansion {
+                    appThemeRaw = manager.customThemeIdentifier(for: newTheme)
+                }
+                applyThemePreferences()
+                showSavedToast()
+            }
+        }
+        .sheet(item: $editingCustomTheme) { theme in
+            CustomThemeEditorView(initialTheme: theme,
+                                  onSave: { updated in
+                                      themeExpansion?.upsert(customTheme: updated)
+                                      if let manager = themeExpansion {
+                                          appThemeRaw = manager.customThemeIdentifier(for: updated)
+                                      }
+                                      applyThemePreferences()
+                                      showSavedToast()
+                                  },
+                                  onDelete: {
+                                      if let manager = themeExpansion {
+                                          manager.delete(customTheme: theme)
+                                          if manager.customThemeIdentifier(for: theme) == appThemeRaw {
+                                              appThemeRaw = AppTheme.system.rawValue
+                                              applyThemePreferences()
+                                          }
+                                      }
+                                  })
+        }
     }
     
     // MARK: - Cards
@@ -194,9 +256,9 @@ struct DisplayView: View {
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
-            
+
             AccentColorPicker(selectedColor: $selectedAccentColor)
-            
+
             HStack(spacing: 12) {
                 Button {
                     if let hex = selectedAccentColor.toHex() {
@@ -219,10 +281,10 @@ struct DisplayView: View {
                     )
                     .foregroundColor(selectedAccentColor.contrastText())
                 }
-                
+
                 Button {
                     customAccentColorHex = ""
-                    selectedAccentColor = .white
+                    selectedAccentColor = .blue
                     showSavedToast()
                 } label: {
                     HStack {
@@ -248,7 +310,115 @@ struct DisplayView: View {
                 )
         )
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
-        .onChange(of: selectedAccentColor) { _, _ in
+    }
+
+    private var themeExpansionUpsellCard: some View {
+        let productLoaded = themeExpansion?.themeExpansionProduct != nil
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("StikDebug Theme Expansion")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+
+            Text("Unlock custom accent colors and dynamic backgrounds with the Theme Expansion.")
+                .font(.body)
+                .foregroundColor(.secondary)
+
+            if let price = themeExpansion?.themeExpansionProduct?.displayPrice {
+                Text("One-time purchase • \(price)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            if productLoaded, let manager = themeExpansion {
+                Button {
+                    Task { await manager.purchaseThemeExpansion() }
+                } label: {
+                    HStack {
+                        if manager.isProcessing {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                        }
+                        Text(manager.isProcessing ? "Purchasing…" : "Unlock Theme Expansion")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.blue)
+                    )
+                    .foregroundColor(Color.blue.contrastText())
+                }
+                .disabled(manager.isProcessing)
+            } else if let manager = themeExpansion {
+                Button {
+                    Task { await manager.refreshEntitlements() }
+                } label: {
+                    HStack {
+                        if manager.isProcessing {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                        }
+                        Text(manager.isProcessing ? "Contacting App Store…" : "Try Again")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                    )
+                }
+                .disabled(manager.isProcessing)
+            }
+
+            if let manager = themeExpansion {
+                Button {
+                    Task { await manager.refreshEntitlements() }
+                } label: {
+                    Text("Restore Purchase")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                        )
+                }
+                .disabled(manager.isProcessing)
+            }
+
+            if let manager = themeExpansion, !productLoaded, manager.lastError == nil {
+                Text(manager.isProcessing ? "Contacting the App Store…" : "Waiting for App Store information.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+
+            if let error = themeExpansion?.lastError {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundColor(.red)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+        .task {
+            if let manager = themeExpansion,
+               !manager.isProcessing,
+               manager.themeExpansionProduct == nil,
+               manager.lastError == nil {
+                await manager.refreshEntitlements()
+            }
         }
     }
     
@@ -290,10 +460,12 @@ struct DisplayView: View {
             // Grid of theme previews
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(AppTheme.allCases, id: \.self) { theme in
-                    ThemePreviewCard(theme: theme, selected: selectedTheme == theme) {
-                        // Write directly to AppStorage to avoid mutating through a computed property
+                    ThemePreviewCard(style: theme.backgroundStyle,
+                                      title: theme.displayName,
+                                      selected: selectedBuiltInTheme == theme && selectedCustomTheme == nil) {
+                        guard hasThemeExpansion else { return }
                         appThemeRaw = theme.rawValue
-                        applyTheme(theme)
+                        applyThemePreferences()
                         showSavedToast()
                     }
                 }
@@ -308,28 +480,101 @@ struct DisplayView: View {
                         .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
                 )
         )
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+    }
+
+    @ViewBuilder
+    private var customThemesSection: some View {
+        if hasThemeExpansion, let manager = themeExpansion {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Custom Themes")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Button {
+                        showingCreateCustomTheme = true
+                    } label: {
+                        Label("New", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+
+                if manager.customThemes.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("Create your own themes with custom colors and motion.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                        Button(action: { showingCreateCustomTheme = true }) {
+                            Text("Create a Custom Theme")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.blue)
+                                )
+                                .foregroundColor(Color.blue.contrastText())
+                        }
+                    }
+                } else {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        ForEach(manager.customThemes, id: \.id) { theme in
+                            let identifier = manager.customThemeIdentifier(for: theme)
+                            ThemePreviewCard(style: manager.backgroundStyle(for: identifier),
+                                             title: theme.name,
+                                             selected: selectedCustomTheme?.id == theme.id) {
+                                appThemeRaw = identifier
+                                applyThemePreferences()
+                                showSavedToast()
+                            }
+                            .contextMenu {
+                                Button("Edit") { editingCustomTheme = theme }
+                                Button("Delete", role: .destructive) {
+                                    manager.delete(customTheme: theme)
+                                    let id = manager.customThemeIdentifier(for: theme)
+                                    if appThemeRaw == id {
+                                        appThemeRaw = AppTheme.system.rawValue
+                                        applyThemePreferences()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                    )
+            )
+            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+        }
     }
     
     // MARK: - Helpers
     
     private func loadCustomAccentColor() {
-        if customAccentColorHex.isEmpty {
-            selectedAccentColor = .white
-        } else {
-            selectedAccentColor = Color(hex: customAccentColorHex) ?? .white
-        }
+        selectedAccentColor = themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
     }
-    
-    private func applyTheme(_ theme: AppTheme) {
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            switch theme {
-            case .darkStatic, .neonAnimated, .blobs, .particles:
-                window.overrideUserInterfaceStyle = .dark
-            case .system:
-                window.overrideUserInterfaceStyle = .unspecified
-            }
+
+    private func applyThemePreferences() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else { return }
+        let scheme = themeExpansion?.preferredColorScheme(for: selectedThemeIdentifier)
+        switch scheme {
+        case .some(.dark):
+            window.overrideUserInterfaceStyle = .dark
+        case .some(.light):
+            window.overrideUserInterfaceStyle = .light
+        default:
+            window.overrideUserInterfaceStyle = .unspecified
         }
     }
     
@@ -344,34 +589,25 @@ struct DisplayView: View {
 // MARK: - Theme Preview Card
 
 private struct ThemePreviewCard: View {
-    let theme: AppTheme
+    let style: BackgroundStyle
+    let title: String
     let selected: Bool
     let action: () -> Void
-    
-    private var hardcodedGradient: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [
-                Color(UIColor.systemBackground),
-                Color(UIColor.secondarySystemBackground)
-            ]),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
     
     var body: some View {
         Button(action: action) {
             ZStack {
-                hardcodedGradient
+                ThemedBackground(style: style)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(.ultraThinMaterial)
-                            .padding(8)
+                            .padding(6)
+                            .opacity(0.55)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
                 VStack(spacing: 6) {
-                    Text(theme.displayName)
+                    Text(title)
                         .font(.footnote.weight(.semibold))
                         .foregroundColor(.primary)
                         .padding(.horizontal, 8)
@@ -382,11 +618,171 @@ private struct ThemePreviewCard: View {
             }
             .frame(height: 120)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(selected ? Color.accentColor : Color.white.opacity(0.12), lineWidth: selected ? 2 : 1)
             )
             .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Custom Theme Editor
+
+private struct CustomThemeEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var name: String
+    @State private var style: CustomThemeStyle
+    @State private var colors: [Color]
+    @State private var appearance: AppearanceOption
+
+    let onSave: (CustomTheme) -> Void
+    let onDelete: (() -> Void)?
+
+    private let maxColors = 4
+
+    init(initialTheme: CustomTheme?,
+         onSave: @escaping (CustomTheme) -> Void,
+         onDelete: (() -> Void)? = nil) {
+        self.onSave = onSave
+        self.onDelete = onDelete
+
+        if let theme = initialTheme {
+            _name = State(initialValue: theme.name)
+            _style = State(initialValue: theme.style)
+            let baseColors = theme.gradientColors
+            _colors = State(initialValue: baseColors.isEmpty ? [Color.blue, Color.purple] : baseColors)
+            _appearance = State(initialValue: AppearanceOption(theme.preferredColorScheme))
+            self.initialTheme = theme
+        } else {
+            _name = State(initialValue: "")
+            _style = State(initialValue: .staticGradient)
+            _colors = State(initialValue: [Color(hex: "#3E4C7C") ?? .indigo,
+                                           Color(hex: "#1C1F3A") ?? .blue])
+            _appearance = State(initialValue: .system)
+            self.initialTheme = nil
+        }
+    }
+
+    private let initialTheme: CustomTheme?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("Details")) {
+                    TextField("Theme Name", text: $name)
+                        .textInputAutocapitalization(.words)
+
+                    Picker("Style", selection: $style) {
+                        ForEach(CustomThemeStyle.allCases) { style in
+                            Text(style.displayName).tag(style)
+                        }
+                    }
+
+                    Picker("Appearance", selection: $appearance) {
+                        ForEach(AppearanceOption.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Section(header: Text("Colors")) {
+                    ForEach(colors.indices, id: \.self) { index in
+                        HStack {
+                            ColorPicker("", selection: Binding(get: {
+                                colors[index]
+                            }, set: { newValue in
+                                if index < colors.count {
+                                    colors[index] = newValue
+                                }
+                            }), supportsOpacity: false)
+                            .labelsHidden()
+
+                            if colors.count > 2 {
+                                Button(role: .destructive) {
+                                    colors.remove(at: index)
+                                } label: {
+                                    Image(systemName: "minus.circle")
+                                }
+                                .padding(.leading, 4)
+                            }
+                        }
+                    }
+
+                    if colors.count < maxColors {
+                        Button {
+                            colors.append(colors.last ?? .blue)
+                        } label: {
+                            Label("Add Color", systemImage: "plus.circle")
+                        }
+                    }
+                }
+
+                if let onDelete {
+                    Section {
+                        Button("Delete Theme", role: .destructive) {
+                            onDelete()
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle(initialTheme == nil ? "New Theme" : "Edit Theme")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let hexes = colors.compactMap { $0.toHex() ?? "#3E4C7C" }
+                        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let finalName = trimmed.isEmpty ? "Untitled Theme" : trimmed
+                        let theme = CustomTheme(id: initialTheme?.id ?? UUID(),
+                                                name: finalName,
+                                                style: style,
+                                                colorHexes: hexes,
+                                                preferredColorScheme: appearance.colorScheme)
+                        onSave(theme)
+                        dismiss()
+                    }
+                    .disabled(colors.count < 2 || colors.allSatisfy { $0.toHex() == nil })
+                }
+            }
+        }
+    }
+
+    private enum AppearanceOption: String, CaseIterable, Identifiable {
+        case system
+        case light
+        case dark
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .system: return "System"
+            case .light:  return "Light"
+            case .dark:   return "Dark"
+            }
+        }
+
+        var colorScheme: ColorScheme? {
+            switch self {
+            case .system: return nil
+            case .light:  return .light
+            case .dark:   return .dark
+            }
+        }
+
+        init(_ scheme: ColorScheme?) {
+            switch scheme {
+            case .some(.light): self = .light
+            case .some(.dark):  self = .dark
+            default:            self = .system
+            }
+        }
     }
 }

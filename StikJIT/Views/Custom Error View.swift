@@ -31,11 +31,8 @@ struct CustomErrorView: View {
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty {
-            return .white
-        } else {
-            return Color(hex: customAccentColorHex) ?? .white
-        }
+        if customAccentColorHex.isEmpty { return .blue }
+        return Color(hex: customAccentColorHex) ?? .blue
     }
     
     

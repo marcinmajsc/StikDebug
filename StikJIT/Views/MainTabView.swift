@@ -9,14 +9,21 @@ import SwiftUI
 
 struct MainTabView: View {
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
     @State private var selection: Int = 0
 
     // Update checking
     @State private var showForceUpdate: Bool = false
     @State private var latestVersion: String? = nil
 
+    @Environment(\.themeExpansionManager) private var themeExpansion
+
     private var accentColor: Color {
-        customAccentColorHex.isEmpty ? .white : (Color(hex: customAccentColorHex) ?? .white)
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
+    }
+    
+    private var preferredScheme: ColorScheme? {
+        themeExpansion?.preferredColorScheme(for: appThemeRaw)
     }
 
     var body: some View {
@@ -42,9 +49,9 @@ struct MainTabView: View {
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                     .tag(4)
             }
-            .id(customAccentColorHex)
+            .id((themeExpansion?.hasThemeExpansion == true) ? customAccentColorHex : "default-accent")
             .tint(accentColor)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(preferredScheme)
             .onAppear {
                 checkForUpdate()
             }
@@ -143,5 +150,6 @@ struct MainTabView: View {
 struct MainTabView_Previews: PreviewProvider {
     static var previews: some View {
         MainTabView()
+            .themeExpansionManager(ThemeExpansionManager(previewUnlocked: true))
     }
 }

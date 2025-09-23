@@ -30,16 +30,50 @@ struct InstalledAppsListView: View {
 
     @AppStorage("performanceMode") private var performanceMode = false
     @State private var showPerformanceToast = false
-    @State private var selectedTab: AppListTab = .debuggable
     @State private var launchingBundles: Set<String> = []
     @State private var launchFeedback: LaunchFeedback? = nil
+    @State private var debuggableSearchText: String = ""
     @State private var otherSearchText: String = ""
 
     @Environment(\.dismiss) private var dismiss
     var onSelectApp: (String) -> Void
 
-    private var filteredRecents: [String] {
-        recentApps.filter { viewModel.debuggableApps[$0] != nil && !favoriteApps.contains($0) }
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    @Environment(\.themeExpansionManager) private var themeExpansion
+    private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
+    private var preferredScheme: ColorScheme? { themeExpansion?.preferredColorScheme(for: appThemeRaw) }
+
+    private var debuggableSearchIsActive: Bool {
+        !debuggableSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var debuggableSortedApps: [(key: String, value: String)] {
+        viewModel.debuggableApps.sorted { lhs, rhs in
+            let comparison = lhs.value.localizedCaseInsensitiveCompare(rhs.value)
+            if comparison == .orderedSame {
+                return lhs.key < rhs.key
+            }
+            return comparison == .orderedAscending
+        }
+    }
+
+    private var filteredDebuggableApps: [(key: String, value: String)] {
+        guard debuggableSearchIsActive else { return debuggableSortedApps }
+        let query = normalizedSearchString(debuggableSearchText)
+        guard !query.isEmpty else { return debuggableSortedApps }
+        return debuggableSortedApps.filter { matches(query, bundleID: $0.key, name: $0.value) }
+    }
+
+    private var filteredDebuggableSet: Set<String> {
+        Set(filteredDebuggableApps.map { $0.key })
+    }
+
+    private var filteredFavoriteBundles: [String] {
+        favoriteApps.filter { filteredDebuggableSet.contains($0) }
+    }
+
+    private var filteredRecentBundles: [String] {
+        recentApps.filter { filteredDebuggableSet.contains($0) && !favoriteApps.contains($0) }
     }
 
     private enum AppListTab: String, CaseIterable, Identifiable {
@@ -79,19 +113,22 @@ struct InstalledAppsListView: View {
     private var filteredOtherApps: [(key: String, value: String)] {
         let base = sortedOtherApps
         guard otherSearchIsActive else { return base }
-        let query = otherSearchText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = normalizedSearchString(otherSearchText)
+        guard !query.isEmpty else { return base }
+        return base.filter { matches(query, bundleID: $0.key, name: $0.value) }
+    }
+
+    private func normalizedSearchString(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             .lowercased()
-        return base.filter {
-            let identifier = $0.key
-                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                .lowercased()
-            let name = $0.value
-                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-                .lowercased()
-            return identifier.contains(query) || name.contains(query)
-        }
+    }
+
+    private func matches(_ normalizedQuery: String, bundleID: String, name: String) -> Bool {
+        guard !normalizedQuery.isEmpty else { return true }
+        let identifier = normalizedSearchString(bundleID)
+        let displayName = normalizedSearchString(name)
+        return identifier.contains(normalizedQuery) || displayName.contains(normalizedQuery)
     }
 
     private func isEmpty(for tab: AppListTab) -> Bool {
@@ -106,7 +143,8 @@ struct InstalledAppsListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.clear.ignoresSafeArea()
+                ThemedBackground(style: backgroundStyle)
+                    .ignoresSafeArea()
 
                 if viewModel.isLoading {
                     ProgressView("Loading Apps…".localized)
@@ -193,6 +231,7 @@ struct InstalledAppsListView: View {
                 }
             }
         }
+        .preferredColorScheme(preferredScheme)
     }
 
     // MARK: Empty State
@@ -241,14 +280,18 @@ struct InstalledAppsListView: View {
 
     // MARK: Apps List
 
-    private var debuggableSections: some View {
+    private func debuggableSections(
+        apps: [(key: String, value: String)],
+        favorites: [String],
+        recents: [String]
+    ) -> some View {
         VStack(spacing: 18) {
-            if !favoriteApps.isEmpty {
+            if !favorites.isEmpty {
                 glassSection(
-                    title: String(format: "Favorites (%d/4)".localized, favoriteApps.count)
+                    title: String(format: "Favorites (%d/4)".localized, favorites.count)
                 ) {
                     LazyVStack(spacing: 12) {
-                        ForEach(favoriteApps, id: \.self) { bundleID in
+                        ForEach(favorites, id: \.self) { bundleID in
                             AppButton(
                                 bundleID: bundleID,
                                 appName: viewModel.debuggableApps[bundleID] ?? bundleID,
@@ -264,10 +307,10 @@ struct InstalledAppsListView: View {
                 }
             }
 
-            if !filteredRecents.isEmpty {
+            if !recents.isEmpty {
                 glassSection(title: "Recents".localized) {
                     LazyVStack(spacing: 12) {
-                        ForEach(filteredRecents, id: \.self) { bundleID in
+                        ForEach(recents, id: \.self) { bundleID in
                             AppButton(
                                 bundleID: bundleID,
                                 appName: viewModel.debuggableApps[bundleID] ?? bundleID,
@@ -285,7 +328,7 @@ struct InstalledAppsListView: View {
 
             glassSection(title: "All Applications".localized) {
                 LazyVStack(spacing: 12) {
-                    ForEach(viewModel.debuggableApps.sorted(by: { $0.key < $1.key }), id: \.key) { bundleID, appName in
+                    ForEach(apps, id: \.key) { bundleID, appName in
                         AppButton(
                             bundleID: bundleID,
                             appName: appName,
@@ -331,22 +374,14 @@ struct InstalledAppsListView: View {
     }
 
     private var tabbedContent: some View {
-        TabView(selection: $selectedTab) {
-            tabContent(for: .debuggable)
-                .tag(AppListTab.debuggable)
-                .tabItem { Text(AppListTab.debuggable.title.localized) }
-
-            tabContent(for: .other)
-                .tag(AppListTab.other)
-                .tabItem { Text(AppListTab.other.title.localized) }
-        }
+        tabContent(for: .debuggable)
     }
 
     @ViewBuilder
     private func tabContent(for tab: AppListTab) -> some View {
         switch tab {
         case .debuggable:
-            if isEmpty(for: .debuggable) {
+            if viewModel.debuggableApps.isEmpty {
                 VStack {
                     Spacer(minLength: 0)
                     emptyState(for: .debuggable)
@@ -359,11 +394,22 @@ struct InstalledAppsListView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 18) {
+                        debuggableSearchBar
+
                         if let error = viewModel.lastError {
                             errorBanner(error)
                         }
 
-                        debuggableSections
+                        if filteredDebuggableApps.isEmpty {
+                            debuggableSearchEmptyState
+                                .transition(.opacity.combined(with: .scale))
+                        } else {
+                            debuggableSections(
+                                apps: filteredDebuggableApps,
+                                favorites: filteredFavoriteBundles,
+                                recents: filteredRecentBundles
+                            )
+                        }
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 24)
@@ -398,6 +444,55 @@ struct InstalledAppsListView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 24)
         }
+    }
+
+    private var debuggableSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField("Search apps or bundle ID".localized, text: $debuggableSearchText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+
+            if debuggableSearchIsActive {
+                Button {
+                    debuggableSearchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Clear search".localized)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
+
+    private var debuggableSearchEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "text.magnifyingglass")
+                .font(.system(size: 44, weight: .regular))
+                .foregroundStyle(.secondary)
+
+            Text("No matching apps".localized)
+                .font(.title3.weight(.semibold))
+
+            Text("Try a different name or bundle identifier.".localized)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .padding(24)
+        .glassCard(cornerRadius: 20, material: .thinMaterial, strokeOpacity: 0.12)
     }
 
     private var otherSearchEmptyState: some View {
@@ -543,12 +638,16 @@ struct AppButton: View {
 
     @AppStorage("loadAppIconsOnJIT") private var loadAppIconsOnJIT = true
     @AppStorage("enableAdvancedOptions") private var enableAdvancedOptions = false
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    @Environment(\.themeExpansionManager) private var themeExpansion
 
     var onSelectApp: (String) -> Void
     let sharedDefaults: UserDefaults
     let performanceMode: Bool
 
     @State private var showScriptPicker = false
+
+    private var rowBackgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
 
     var body: some View {
         Button(action: selectApp) {
@@ -663,24 +762,7 @@ struct AppButton: View {
     // MARK: Row Background
 
     private var rowBackground: some View {
-        Group {
-            if performanceMode {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(.secondarySystemBackground).opacity(0.65))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(.white.opacity(0.10), lineWidth: 1)
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(.white.opacity(0.15), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-            }
-        }
+        ThemedRowBackground(performanceMode: performanceMode, style: rowBackgroundStyle, cornerRadius: 16)
     }
 
     // MARK: Actions
@@ -760,9 +842,13 @@ struct LaunchAppRow: View {
     @Binding var appIcons: [String: UIImage]
 
     @AppStorage("loadAppIconsOnJIT") private var loadAppIconsOnJIT = true
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    @Environment(\.themeExpansionManager) private var themeExpansion
 
     let performanceMode: Bool
     var launchAction: () -> Void
+
+    private var rowBackgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
 
     var body: some View {
         Button {
@@ -844,24 +930,7 @@ struct LaunchAppRow: View {
     }
 
     private var rowBackground: some View {
-        Group {
-            if performanceMode {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(.secondarySystemBackground).opacity(0.65))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(.white.opacity(0.10), lineWidth: 1)
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(.white.opacity(0.15), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-            }
-        }
+        ThemedRowBackground(performanceMode: performanceMode, style: rowBackgroundStyle, cornerRadius: 16)
     }
 
     private func loadAppIcon(for bundleID: String) {
@@ -876,6 +945,75 @@ struct LaunchAppRow: View {
                 appIcons[bundleID] = image
             }
         }
+    }
+}
+
+private struct ThemedRowBackground: View {
+    var performanceMode: Bool
+    var style: BackgroundStyle
+    var cornerRadius: CGFloat
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        return Group {
+            if performanceMode {
+                shape
+                    .fill(Color(.secondarySystemBackground).opacity(0.65))
+                    .overlay(shape.stroke(Color.white.opacity(0.10), lineWidth: 1))
+            } else {
+                ZStack {
+                    shape.fill(.ultraThinMaterial)
+                    themedOverlay(shape: shape)
+                    shape.stroke(Color.white.opacity(0.15), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func themedOverlay(shape: RoundedRectangle) -> some View {
+        switch style {
+        case .staticGradient(let colors), .customGradient(let colors):
+            shape
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: normalized(colors)),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .opacity(0.32)
+        case .animatedGradient(let colors, _):
+            shape
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: normalized(colors)),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .opacity(0.38)
+        case .blobs(let colors, _):
+            shape
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: normalized(colors)),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .opacity(0.40)
+        case .particles(let particle, _):
+            shape.fill(particle.opacity(0.18))
+        }
+    }
+
+    private func normalized(_ colors: [Color]) -> [Color] {
+        if colors.count >= 2 { return colors }
+        if let first = colors.first { return [first, first.opacity(0.6)] }
+        return [Color.blue, Color.purple]
     }
 }
 

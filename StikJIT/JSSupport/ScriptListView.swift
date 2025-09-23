@@ -37,12 +37,14 @@ struct ScriptListView: View {
     }
     
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
-    private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
+    @Environment(\.themeExpansionManager) private var themeExpansion
+    private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
+    private var preferredScheme: ColorScheme? { themeExpansion?.preferredColorScheme(for: appThemeRaw) }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                ThemedBackground(style: currentTheme.backgroundStyle)
+                ThemedBackground(style: backgroundStyle)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -134,6 +136,7 @@ struct ScriptListView: View {
                 }
             }
         }
+        .preferredColorScheme(preferredScheme)
     }
 
     // MARK: - Cards
@@ -251,13 +254,41 @@ struct ScriptListView: View {
     }
 
     private var glassyBackground: some View {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
-            .fill(.ultraThinMaterial)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+        ZStack {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: overlayColors()),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .opacity(0.32)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
+    }
+
+    private func overlayColors() -> [Color] {
+        let colors: [Color]
+        switch backgroundStyle {
+        case .staticGradient(let palette):
+            colors = palette
+        case .animatedGradient(let palette, _):
+            colors = palette
+        case .blobs(_, let background):
+            colors = background
+        case .particles(let particle, let background):
+            colors = background.isEmpty ? [particle, particle.opacity(0.4)] : background
+        case .customGradient(let palette):
+            colors = palette
+        }
+        if colors.count >= 2 { return colors }
+        if let first = colors.first { return [first, first.opacity(0.6)] }
+        return [Color.blue, Color.purple]
     }
 
     // MARK: - File Ops
