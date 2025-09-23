@@ -42,15 +42,21 @@ enum AppTheme: String, CaseIterable, Identifiable {
     
     var preferredColorScheme: ColorScheme? {
         switch self {
-        case .system, .sunset, .forest: return nil
-        case .darkStatic, .neonAnimated, .blobs, .particles, .aurora, .ocean, .midnight, .cyberwave: return .dark
+        case .system:
+            // Make the default theme use a dark appearance to match Obsidian.
+            return .dark
+        case .sunset, .forest:
+            return nil
+        case .darkStatic, .neonAnimated, .blobs, .particles, .aurora, .ocean, .midnight, .cyberwave:
+            return .dark
         }
     }
     
     var backgroundStyle: BackgroundStyle {
         switch self {
         case .system:
-            return .staticGradient(colors: Palette.defaultGradient)
+            // Make the default theme render with the Obsidian gradient.
+            return .staticGradient(colors: Palette.obsidianGradient)
         case .darkStatic:
             return .staticGradient(colors: Palette.obsidianGradient)
         case .neonAnimated:
