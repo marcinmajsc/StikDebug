@@ -100,7 +100,9 @@ struct HomeView: View {
                         }
 
                         readinessCard
-                        quickConnectCard
+                        if pairingFileExists {
+                            quickConnectCard
+                        }
                         if !pinnedLaunchItems.isEmpty {
                             launchShortcutsCard
                         }
@@ -440,7 +442,7 @@ struct HomeView: View {
         if !ddiMounted {
             return .init(
                 title: "Mount the Developer Disk Image",
-                subtitle: "Open Settings → Developer Disk Image and follow the prompts before connecting.",
+                subtitle: "",
                 icon: "externaldrive.badge.exclamationmark",
                 tint: .yellow
             )
@@ -525,7 +527,7 @@ struct HomeView: View {
             pairingItem,
             ChecklistItem(
                 title: "Developer Disk Image",
-                subtitle: ddiMounted ? "Mounted successfully." : "Open Settings → Developer Disk Image and tap Mount.",
+                subtitle: ddiMounted ? "Mounted successfully." : "",
                 status: ddiMounted ? .ready : .attention,
                 actionTitle: nil,
                 action: nil
@@ -1666,4 +1668,3 @@ public extension ProcessInfo {
         }()
     }
 }
-
