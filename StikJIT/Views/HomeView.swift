@@ -427,14 +427,14 @@ struct HomeView: View {
             if pairingFilePresentOnDisk {
                 return .init(
                     title: "Pairing file needs attention",
-                    subtitle: "We found a pairing file but couldn’t read it. Re-import it from your trusted computer.",
+                    subtitle: "We found a pairing file but couldn’t read it.",
                     icon: "doc.badge.exclamationmark",
                     tint: .yellow
                 )
             }
             return .init(
                 title: "Import your pairing file",
-                subtitle: "Grab the pairing file from your computer to unlock app discovery.",
+                subtitle: "",
                 icon: "doc.badge.plus",
                 tint: .orange
             )
