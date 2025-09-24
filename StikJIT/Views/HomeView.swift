@@ -254,7 +254,7 @@ struct HomeView: View {
                                 autoScriptData = data
                                 autoScriptName = "melo.js"
                             }
-                        } else if appName == "UTM" {
+                        } else if appName == "UTM" || appName == "DolphiniOS" {
                             if let url = Bundle.main.url(forResource: "utmjit", withExtension: "js"),
                                let data = try? Data(contentsOf: url) {
                                 autoScriptData = data
