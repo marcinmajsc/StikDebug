@@ -93,9 +93,11 @@ final class ThemeExpansionManager: ObservableObject {
 
         guard !previewUnlocked else { return }
 
-        updatesTask = Task.detached(priority: .background) { [weak self] in
+        // Listen for transaction updates and apply verified ones
+        updatesTask = Task { [weak self] in
+            guard let self else { return }
             for await result in StoreKit.Transaction.updates {
-                await self?.handle(transactionResult: result)
+                await self.handle(transactionResult: result)
             }
         }
 
@@ -115,11 +117,33 @@ final class ThemeExpansionManager: ObservableObject {
             let products = try await Product.products(for: [Self.productIdentifier])
             themeExpansionProduct = products.first
 
-            if let latest = await StoreKit.Transaction.latest(for: Self.productIdentifier) {
-                await handle(transactionResult: latest, finishTransaction: false)
-            } else {
-                hasThemeExpansion = false
+            if products.isEmpty {
+                #if targetEnvironment(simulator)
+                lastError = """
+                No products found for.
+                """
+                #else
+                lastError = """
+                No products found for.
+                """
+                #endif
             }
+
+            // Recompute entitlement from current entitlements
+            hasThemeExpansion = await isEntitledToThemeExpansion()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func restorePurchases() async {
+        guard !isPreviewInstance else { return }
+        isProcessing = true
+        defer { isProcessing = false }
+        do {
+            lastError = nil
+            try await AppStore.sync()
+            hasThemeExpansion = await isEntitledToThemeExpansion()
         } catch {
             lastError = error.localizedDescription
         }
@@ -138,7 +162,15 @@ final class ThemeExpansionManager: ObservableObject {
                     themeExpansionProduct = first
                     product = first
                 } else {
-                    lastError = "Theme Expansion isn't available yet. Check your App Store configuration and try again."
+                    #if targetEnvironment(simulator)
+                    lastError = """
+                    Theme Expansion isn’t available.
+                    """
+                    #else
+                    lastError = """
+                    Theme Expansion isn’t available.
+                    """
+                    #endif
                     return
                 }
             } catch {
@@ -278,7 +310,7 @@ final class ThemeExpansionManager: ObservableObject {
         switch transactionResult {
         case .verified(let transaction):
             if transaction.productID == Self.productIdentifier {
-                hasThemeExpansion = true
+                hasThemeExpansion = (transaction.revocationDate == nil)
                 lastError = nil
             }
             if finishTransaction {
@@ -287,6 +319,15 @@ final class ThemeExpansionManager: ObservableObject {
         case .unverified(_, let error):
             lastError = error.localizedDescription
         }
+    }
+
+    private func isEntitledToThemeExpansion() async -> Bool {
+        for await result in Transaction.currentEntitlements {
+            if case .verified(let transaction) = result, transaction.productID == Self.productIdentifier {
+                return transaction.revocationDate == nil
+            }
+        }
+        return false
     }
 }
 

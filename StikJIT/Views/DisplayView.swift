@@ -375,7 +375,7 @@ struct DisplayView: View {
 
             if let manager = themeExpansion {
                 Button {
-                    Task { await manager.refreshEntitlements() }
+                    Task { await manager.restorePurchases() }
                 } label: {
                     Text("Restore Purchase")
                         .font(.subheadline)
