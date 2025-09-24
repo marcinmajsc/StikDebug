@@ -100,9 +100,9 @@ struct HomeView: View {
                         }
 
                         readinessCard
-                        if pairingFileExists {
-                            quickConnectCard
-                        }
+                       // if pairingFileExists {
+                    //        quickConnectCard
+                      //  }
                         if !pinnedLaunchItems.isEmpty {
                             launchShortcutsCard
                         }
