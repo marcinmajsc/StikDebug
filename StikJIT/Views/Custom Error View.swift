@@ -29,13 +29,13 @@ struct CustomErrorView: View {
     
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
-    
+    @Environment(\.themeExpansionManager) private var themeExpansion
+
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty {
-            return Color.accentColor
-        } else {
-            return Color(hex: customAccentColorHex) ?? Color.accentColor
-        }
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex)
+            ?? (customAccentColorHex.isEmpty
+                ? Color.accentColor
+                : (Color(hex: customAccentColorHex) ?? Color.accentColor))
     }
 
     private var primaryButtonForegroundColor: Color {

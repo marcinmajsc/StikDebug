@@ -13,8 +13,7 @@ struct ConsoleLogsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accentColor) private var environmentAccentColor
     @StateObject private var logManager = LogManager.shared
-    @State private var autoScroll = true
-    @State private var scrollView: ScrollViewProxy? = nil
+    @State private var jitScrollView: ScrollViewProxy? = nil
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     
     @State private var showingCustomAlert = false
@@ -27,144 +26,33 @@ struct ConsoleLogsView: View {
     @State private var isViewActive = false
     @State private var lastProcessedLineCount = 0
     @State private var isLoadingLogs = false
-    @State private var isAtBottom = true
-    
+    @State private var jitIsAtBottom = true
+    @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
+    @Environment(\.themeExpansionManager) private var themeExpansion
+    private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
+    private var preferredScheme: ColorScheme? { themeExpansion?.preferredColorScheme(for: appThemeRaw) }
+
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty {
-            return .blue
-        } else {
-            return Color(hex: customAccentColorHex) ?? .blue
-        }
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
     }
-    
+
+    private var overlayOpacity: Double {
+        colorScheme == .dark ? 0.82 : 0.9
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
+                ThemedBackground(style: backgroundStyle)
+                    .ignoresSafeArea()
                 Color(colorScheme == .dark ? .black : .white)
-                    .edgesIgnoringSafeArea(.all)
-                
+                    .opacity(overlayOpacity)
+                    .ignoresSafeArea()
+
                 VStack(spacing: 0) {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("=== DEVICE INFORMATION ===")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(colorScheme == .dark ? .white : .black)
-                                        .padding(.vertical, 4)
-                                    
-                                    Text("iOS Version: \(UIDevice.current.systemVersion)")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(colorScheme == .dark ? .white : .black)
-                                    
-                                    Text("Device: \(UIDevice.current.name)")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(colorScheme == .dark ? .white : .black)
-                                    
-                                    Text("Model: \(UIDevice.current.model)")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(colorScheme == .dark ? .white : .black)
-                                    
-                                    Text("=== LOG ENTRIES ===")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(colorScheme == .dark ? .white : .black)
-                                        .padding(.vertical, 4)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 4)
-                                
-                                ForEach(logManager.logs) { logEntry in
-                                    Text(AttributedString(createLogAttributedString(logEntry)))
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .textSelection(.enabled)
-                                        .lineLimit(nil)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 1)
-                                        .padding(.horizontal, 4)
-                                        .id(logEntry.id)
-                                }
-                            }
-                            .background(
-                                GeometryReader { geometry in
-                                    Color.clear.preference(
-                                        key: ScrollOffsetPreferenceKey.self,
-                                        value: geometry.frame(in: .named("scroll")).minY
-                                    )
-                                }
-                            )
-                        }
-                        .coordinateSpace(name: "scroll")
-                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
-                            isAtBottom = offset > -20
-                        }
-                        .onChange(of: logManager.logs.count) { _ in
-                            if isAtBottom {
-                                withAnimation {
-                                    if let lastLog = logManager.logs.last {
-                                        proxy.scrollTo(lastLog.id, anchor: .bottom)
-                                    }
-                                }
-                            }
-                        }
-                        .onAppear {
-                            scrollView = proxy
-                            isViewActive = true
-                            Task {
-                                await loadIdeviceLogsAsync()
-                            }
-                            startLogCheckTimer()
-                        }
-                        .onDisappear {
-                            isViewActive = false
-                            stopLogCheckTimer()
-                        }
-                    }
-                    
+                    jitLogsPane
                     Spacer(minLength: 0)
-                    
-                    HStack(spacing: 12) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .imageScale(.small)
-                                .foregroundColor(.red)
-                            Text("\(logManager.errorCount) Errors")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        
-                        Button {
-                            var logsContent = "=== DEVICE INFORMATION ===\n"
-                            logsContent += "Version: \(UIDevice.current.systemVersion)\n"
-                            logsContent += "Name: \(UIDevice.current.name)\n"
-                            logsContent += "Model: \(UIDevice.current.model)\n"
-                            logsContent += "StikJIT Version: App Version: 1.0\n\n"
-                            logsContent += "=== LOG ENTRIES ===\n"
-                            
-                            logsContent += logManager.logs.map {
-                                "[\(formatTime(date: $0.timestamp))] [\($0.type.rawValue)] \($0.message)"
-                            }.joined(separator: "\n")
-                            
-                            UIPasteboard.general.string = logsContent
-                            
-                            alertTitle = "Logs Copied"
-                            alertMessage = "Logs have been copied to clipboard."
-                            isError = false
-                            showingCustomAlert = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "doc.on.doc")
-                                Text("Copy")
-                            }
-                            .foregroundColor(accentColor)
-                        }
-                        .buttonStyle(GlassOvalButtonStyle(height: 36, strokeOpacity: 0.18))
-                        
-                        exportControl
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    jitFooter
                 }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -173,7 +61,7 @@ struct ConsoleLogsView: View {
                             .font(.headline)
                             .foregroundColor(colorScheme == .dark ? .white : .black)
                     }
-                    
+
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(action: { dismiss() }) {
                             HStack(spacing: 2) {
@@ -183,7 +71,7 @@ struct ConsoleLogsView: View {
                             .foregroundColor(accentColor)
                         }
                     }
-                    
+
                     ToolbarItem(placement: .navigationBarTrailing) {
                         HStack {
                             Button(action: {
@@ -192,7 +80,7 @@ struct ConsoleLogsView: View {
                                 Image(systemName: "arrow.clockwise")
                                     .foregroundColor(accentColor)
                             }
-                            
+
                             Button(action: {
                                 logManager.clearLogs()
                             }) {
@@ -224,8 +112,126 @@ struct ConsoleLogsView: View {
                 }
             )
         }
+        .preferredColorScheme(preferredScheme)
     }
     
+    private var jitLogsPane: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("=== DEVICE INFORMATION ===")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+                            .padding(.vertical, 4)
+
+                        Text("iOS Version: \(UIDevice.current.systemVersion)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+
+                        Text("Device: \(UIDevice.current.name)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+
+                        Text("Model: \(UIDevice.current.model)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+
+                        Text("=== LOG ENTRIES ===")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(colorScheme == .dark ? .white : .black)
+                            .padding(.vertical, 4)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+
+                    ForEach(logManager.logs) { logEntry in
+                        Text(AttributedString(createLogAttributedString(logEntry)))
+                            .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 1)
+                            .padding(.horizontal, 4)
+                            .id(logEntry.id)
+                    }
+                }
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: ScrollOffsetPreferenceKey.self,
+                            value: geometry.frame(in: .named("jitScroll")).minY
+                        )
+                    }
+                )
+            }
+            .coordinateSpace(name: "jitScroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { offset in
+                jitIsAtBottom = offset > -20
+            }
+            .onChange(of: logManager.logs.count) { _ in
+                guard jitIsAtBottom, let lastLog = logManager.logs.last else { return }
+                withAnimation {
+                    proxy.scrollTo(lastLog.id, anchor: .bottom)
+                }
+            }
+            .onAppear {
+                jitScrollView = proxy
+                isViewActive = true
+                Task { await loadIdeviceLogsAsync() }
+                startLogCheckTimer()
+            }
+            .onDisappear {
+                isViewActive = false
+                stopLogCheckTimer()
+            }
+        }
+    }
+
+    private var jitFooter: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .imageScale(.small)
+                    .foregroundColor(.red)
+                Text("\(logManager.errorCount) Errors")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            Spacer(minLength: 8)
+
+            Button {
+                var logsContent = "=== DEVICE INFORMATION ===\n"
+                logsContent += "Version: \(UIDevice.current.systemVersion)\n"
+                logsContent += "Name: \(UIDevice.current.name)\n"
+                logsContent += "Model: \(UIDevice.current.model)\n"
+                logsContent += "StikJIT Version: App Version: 1.0\n\n"
+                logsContent += "=== LOG ENTRIES ===\n"
+
+                logsContent += logManager.logs.map {
+                    "[\(formatTime(date: $0.timestamp))] [\($0.type.rawValue)] \($0.message)"
+                }.joined(separator: "\n")
+
+                UIPasteboard.general.string = logsContent
+
+                alertTitle = "Logs Copied"
+                alertMessage = "Logs have been copied to clipboard."
+                isError = false
+                showingCustomAlert = true
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .foregroundColor(accentColor)
+            }
+            .buttonStyle(GlassOvalButtonStyle(height: 36, strokeOpacity: 0.18))
+            .accessibilityLabel("Copy app logs")
+
+            exportControl
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
     @ViewBuilder
     private var exportControl: some View {
         let logURL: URL = URL.documentsDirectory.appendingPathComponent("idevice_log.txt")
@@ -234,13 +240,11 @@ struct ConsoleLogsView: View {
                 item: logURL,
                 preview: SharePreview("idevice_log.txt", image: Image(systemName: "doc.text"))
             ) {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.and.arrow.up")
-                    Text("Export")
-                }
-                .foregroundColor(accentColor)
+                Image(systemName: "square.and.arrow.up")
+                    .foregroundColor(accentColor)
             }
             .buttonStyle(GlassOvalButtonStyle(height: 36, strokeOpacity: 0.18))
+            .accessibilityLabel("Export app logs")
         } else {
             Button {
                 alertTitle = "Export Failed"
@@ -248,13 +252,11 @@ struct ConsoleLogsView: View {
                 isError = true
                 showingCustomAlert = true
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.and.arrow.up")
-                    Text("Export")
-                }
-                .foregroundColor(accentColor)
+                Image(systemName: "square.and.arrow.up")
+                    .foregroundColor(accentColor)
             }
             .buttonStyle(GlassOvalButtonStyle(height: 36, strokeOpacity: 0.18))
+            .accessibilityLabel("Export app logs")
         }
     }
     
@@ -286,13 +288,6 @@ struct ConsoleLogsView: View {
         
         return fullString
     }
-    
-    private func timeString() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: Date())
-    }
-    
     private func formatTime(date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
@@ -360,6 +355,10 @@ struct ConsoleLogsView: View {
                         logManager.addInfoLog(line)
                     }
                 }
+
+                if jitIsAtBottom, let last = logManager.logs.last {
+                    jitScrollView?.scrollTo(last.id, anchor: .bottom)
+                }
             }
         } catch {
             await MainActor.run {
@@ -421,6 +420,10 @@ struct ConsoleLogsView: View {
                         let excessCount = logManager.logs.count - maxLines
                         logManager.removeOldestLogs(count: excessCount)
                     }
+
+                    if jitIsAtBottom, let last = logManager.logs.last {
+                        jitScrollView?.scrollTo(last.id, anchor: .bottom)
+                    }
                 }
             }
         } catch {
@@ -458,6 +461,7 @@ private struct GlassOvalButtonStyle: ButtonStyle {
 struct ConsoleLogsView_Previews: PreviewProvider {
     static var previews: some View {
         ConsoleLogsView()
+            .themeExpansionManager(ThemeExpansionManager(previewUnlocked: true))
     }
 }
 
