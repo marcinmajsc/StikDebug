@@ -147,12 +147,14 @@ struct DeviceInfoView: View {
     }
     
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
-    private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
+    @Environment(\.themeExpansionManager) private var themeExpansion
+    private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
+    private var preferredScheme: ColorScheme? { themeExpansion?.preferredColorScheme(for: appThemeRaw) }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                ThemedBackground(style: currentTheme.backgroundStyle)
+                ThemedBackground(style: backgroundStyle)
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -260,6 +262,7 @@ struct DeviceInfoView: View {
             .onAppear { if isPaired { mgr.initAndLoad() } }
             .onDisappear { mgr.cleanup() }
         }
+        .preferredColorScheme(preferredScheme)
     }
 
     // MARK: - UI Sections

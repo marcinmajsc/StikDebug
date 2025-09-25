@@ -25,9 +25,10 @@ struct WelcomeSheetView: View {
     var onDismiss: (() -> Void)?
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    @Environment(\.themeExpansionManager) private var themeExpansion
     
     private var accent: Color {
-        customAccentColorHex.isEmpty ? .accentColor : (Color(hex: customAccentColorHex) ?? .accentColor)
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
     }
     
     var body: some View {
@@ -512,11 +513,11 @@ struct HeartbeatApp: App {
     @State private var alert_string = ""
     @State private var alert_title = ""
     @State private var showTimeoutError = false
-    @State private var showLogs = false
     @State private var showContinueWarning = false
     @State private var timeoutTimer: Timer?
     @StateObject private var mount = MountingProgress.shared
     @StateObject private var dnsChecker = DNSChecker()
+    @StateObject private var themeExpansionManager = ThemeExpansionManager()
     @Environment(\.scenePhase) private var scenePhase   // Observe scene lifecycle
     
     let urls: [String] = [
@@ -540,14 +541,18 @@ struct HeartbeatApp: App {
         let origMethod = class_getInstanceMethod(UIDocumentPickerViewController.self, #selector(UIDocumentPickerViewController.init(forOpeningContentTypes:asCopy:)))!
         method_exchangeImplementations(origMethod, fixMethod)
         
-        // Initialize UIKit tint from stored accent at launch
-        HeartbeatApp.updateUIKitTintFromStoredAccent()
+        // Initialize UIKit tint from stored accent at launch (defaults to blue until entitlements load)
+        HeartbeatApp.updateUIKitTint(customHex: customAccentColorHex, hasAccess: false)
     }
     
     // Make this static so we can call it without capturing self in init
-    private static func updateUIKitTintFromStoredAccent() {
-        let hex = UserDefaults.standard.string(forKey: "customAccentColor") ?? ""
-        let color = hex.isEmpty ? UIColor.tintColor : UIColor(Color(hex: hex) ?? .accentColor)
+    private static func updateUIKitTint(customHex: String, hasAccess: Bool) {
+        let color: UIColor
+        if hasAccess, !customHex.isEmpty, let swiftColor = Color(hex: customHex) {
+            color = UIColor(swiftColor)
+        } else {
+            color = .systemBlue
+        }
         UIView.appearance().tintColor = color
     }
     
@@ -570,8 +575,7 @@ struct HeartbeatApp: App {
     }
     
     private var globalAccent: Color {
-        let hex = customAccentColorHex
-        return hex.isEmpty ? .accentColor : (Color(hex: hex) ?? .accentColor)
+        themeExpansionManager.resolvedAccentColor(from: customAccentColorHex)
     }
     
     var body: some Scene {
@@ -583,7 +587,7 @@ struct HeartbeatApp: App {
                             .onAppear {
                                 dnsChecker.checkDNS()
                                 timeoutTimer?.invalidate()
-                                timeoutTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { _ in
+                                timeoutTimer = Timer.scheduledTimer(withTimeInterval: 7, repeats: false) { _ in
                                     if isLoading2 {
                                         showTimeoutError = true
                                     }
@@ -666,14 +670,9 @@ struct HeartbeatApp: App {
                                             },
                                             showButton: true,
                                             primaryButtonText: NSLocalizedString("Continue Anyway", comment: ""),
-                                            secondaryButtonText: NSLocalizedString("View Logs", comment: ""),
                                             onPrimaryButtonTap: {
                                                 showContinueWarning = true
-                                            },
-                                            onSecondaryButtonTap: {
-                                                showLogs = true
-                                            },
-                                            showSecondaryButton: true
+                                            }
                                         )
                                     }
 
@@ -694,11 +693,6 @@ struct HeartbeatApp: App {
                                     }
                                 }
                             )
-                            .sheet(isPresented: $showLogs, onDismiss: {
-                                isLoading2 = false
-                            }) {
-                                ConsoleLogsView()
-                            }
                     } else {
                         MainTabView()
                             .onAppear {
@@ -733,33 +727,34 @@ struct HeartbeatApp: App {
                             )
                     }
                 }
-                // Apply global tint to all SwiftUI views in this window
-                .tint(globalAccent)
-                .onAppear {
-                    // On first launch, present the welcome sheet.
-                    // Otherwise, start the VPN automatically.
-                    if !hasLaunchedBefore {
-                        showWelcomeSheet = true
-                    } else {
-                        TunnelManager.shared.startVPN()
-                    }
-                    // Update UIKit tint now and subscribe to changes without capturing self
-                    HeartbeatApp.updateUIKitTintFromStoredAccent()
-                    NotificationCenter.default.addObserver(
-                        forName: UserDefaults.didChangeNotification,
-                        object: nil,
-                        queue: .main
-                    ) { _ in
-                        HeartbeatApp.updateUIKitTintFromStoredAccent()
-                    }
+            }
+            .themeExpansionManager(themeExpansionManager)
+            // Apply global tint to all SwiftUI views in this window
+            .tint(globalAccent)
+            .onAppear {
+                // On first launch, present the welcome sheet.
+                // Otherwise, start the VPN automatically.
+                if !hasLaunchedBefore {
+                    showWelcomeSheet = true
+                } else {
+                    TunnelManager.shared.startVPN()
                 }
-                .sheet(isPresented: $showWelcomeSheet) {
-                    WelcomeSheetView {
-                        // When the user taps "Continue", mark the app as launched and start the VPN.
-                        hasLaunchedBefore = true
-                        showWelcomeSheet = false
-                        TunnelManager.shared.startVPN()
-                    }
+                HeartbeatApp.updateUIKitTint(customHex: customAccentColorHex,
+                                             hasAccess: themeExpansionManager.hasThemeExpansion)
+            }
+            .onChange(of: themeExpansionManager.hasThemeExpansion) { hasAccess in
+                HeartbeatApp.updateUIKitTint(customHex: customAccentColorHex, hasAccess: hasAccess)
+            }
+            .onChange(of: customAccentColorHex) { newHex in
+                HeartbeatApp.updateUIKitTint(customHex: newHex,
+                                             hasAccess: themeExpansionManager.hasThemeExpansion)
+            }
+            .sheet(isPresented: $showWelcomeSheet) {
+                WelcomeSheetView {
+                    // When the user taps "Continue", mark the app as launched and start the VPN.
+                    hasLaunchedBefore = true
+                    showWelcomeSheet = false
+                    TunnelManager.shared.startVPN()
                 }
             }
         }
@@ -974,13 +969,10 @@ struct LoadingView: View {
     @State private var animate = false
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    @Environment(\.themeExpansionManager) private var themeExpansion
     
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty {
-            return .accentColor
-        } else {
-            return Color(hex: customAccentColorHex) ?? .accentColor
-        }
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
     }
     
     var body: some View {
@@ -1129,4 +1121,3 @@ func downloadFile(from urlString: String, to destinationURL: URL, completion: @e
     task.resume()
     completion("")
 }
-

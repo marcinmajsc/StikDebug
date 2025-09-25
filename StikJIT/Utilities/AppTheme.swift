@@ -10,63 +10,114 @@ import SwiftUI
 // MARK: - AppTheme model
 
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system            // follows system appearance; static gradient
-    case darkStatic        // dark + static gradient
-    case neonAnimated      // animated gradient
-    case blobs             // morphing blobs
-    case particles         // subtle particle field
+    case system            // balanced default gradient
+    case darkStatic        // deep charcoal blend
+    case neonAnimated      // neon pulse
+    case blobs             // vibrant haze
+    case particles         // subtle celestial particles
+    case aurora            // shifting aurora lights
+    case sunset            // warm sunset glow
+    case ocean             // tranquil ocean blues
+    case forest            // lush forest canopy
+    case midnight          // midnight horizon
+    case cyberwave         // synthwave inspired
     
     var id: String { rawValue }
     
     var displayName: String {
         switch self {
-        case .system:       return "System"
-        case .darkStatic:   return "Dark"
-        case .neonAnimated: return "Neon"
-        case .blobs:        return "Blobs"
-        case .particles:    return "Particles"
+        case .system:       return "Default"
+        case .darkStatic:   return "Obsidian"
+        case .neonAnimated: return "Neon Pulse"
+        case .blobs:        return "Haze"
+        case .particles:    return "Stardust"
+        case .aurora:       return "Aurora"
+        case .sunset:       return "Sunset"
+        case .ocean:        return "Ocean"
+        case .forest:       return "Forest"
+        case .midnight:     return "Midnight"
+        case .cyberwave:    return "Cyberwave"
         }
     }
     
-    // If you want the theme to force a color scheme, set it here.
-    // Your app currently forces dark globally; we keep nil so nothing fights it.
     var preferredColorScheme: ColorScheme? {
         switch self {
-        case .system:       return nil
-        case .darkStatic:   return .dark
-        case .neonAnimated: return .dark
-        case .blobs:        return .dark
-        case .particles:    return .dark
+        case .system:
+            // Make the default theme use a dark appearance to match Obsidian.
+            return .dark
+        case .sunset, .forest:
+            return nil
+        case .darkStatic, .neonAnimated, .blobs, .particles, .aurora, .ocean, .midnight, .cyberwave:
+            return .dark
         }
     }
     
     var backgroundStyle: BackgroundStyle {
         switch self {
-        case .system:       return .staticGradient
-        case .darkStatic:   return .staticGradient
-        case .neonAnimated: return .animatedGradient
-        case .blobs:        return .blobs
-        case .particles:    return .particles
+        case .system:
+            // Make the default theme render with the Obsidian gradient.
+            return .staticGradient(colors: Palette.obsidianGradient)
+        case .darkStatic:
+            return .staticGradient(colors: Palette.obsidianGradient)
+        case .neonAnimated:
+            return .animatedGradient(colors: Palette.neon, speed: 0.10)
+        case .blobs:
+            return .blobs(colors: Palette.hazeBlobs, background: Palette.hazeBackground)
+        case .particles:
+            return .particles(particle: Palette.stardustParticle, background: Palette.stardustBackground)
+        case .aurora:
+            return .animatedGradient(colors: Palette.aurora, speed: 0.08)
+        case .sunset:
+            return .staticGradient(colors: Palette.sunset)
+        case .ocean:
+            return .animatedGradient(colors: Palette.ocean, speed: 0.06)
+        case .forest:
+            return .staticGradient(colors: Palette.forest)
+        case .midnight:
+            return .particles(particle: Palette.midnightParticle, background: Palette.midnightBackground)
+        case .cyberwave:
+            return .blobs(colors: Palette.cyberwaveBlobs, background: Palette.cyberwaveBackground)
         }
     }
 }
 
 // MARK: - Background styles and factory
 
-enum BackgroundStyle {
-    case staticGradient
-    case animatedGradient
-    case blobs
-    case particles
+enum BackgroundStyle: Equatable {
+    case staticGradient(colors: [Color])
+    case animatedGradient(colors: [Color], speed: Double)
+    case blobs(colors: [Color], background: [Color])
+    case particles(particle: Color, background: [Color])
+    case customGradient(colors: [Color])
 }
 
-// Slightly brighter, clearly-not-black static background that still respects dark mode
-private func staticBackgroundGradient() -> LinearGradient {
+private struct Palette {
+    static let defaultGradient = hexColors("#1C1F3A", "#3E4C7C", "#1F1C2C")
+    static let obsidianGradient = hexColors("#000000", "#1C1C1C", "#262626")
+    static let neon = hexColors("#00F5A0", "#00D9F5", "#C96BFF")
+    static let hazeBlobs = hexColors("#FF8BA7", "#A98BFF", "#70C8FF", "#67FFDA")
+    static let hazeBackground = hexColors("#141321", "#1E1C2A")
+    static let stardustParticle = Color(hex: "#9BD4FF") ?? .white
+    static let stardustBackground = hexColors("#090A1A", "#1C1F3A")
+    static let aurora = hexColors("#0BA360", "#3CBA92", "#8241FF")
+    static let sunset = hexColors("#FF5F6D", "#FFC371", "#FF9966")
+    static let ocean = hexColors("#0093E9", "#80D0C7", "#13547A")
+    static let forest = hexColors("#2F7336", "#AA3A38", "#052E03")
+    static let midnightParticle = Color(hex: "#9F9FFF") ?? .white
+    static let midnightBackground = hexColors("#0F2027", "#203A43", "#2C5364")
+    static let cyberwaveBlobs = hexColors("#FF0080", "#7928CA", "#2A2A72", "#00F0FF")
+    static let cyberwaveBackground = hexColors("#08001A", "#110032")
+
+    static func hexColors(_ hexes: String...) -> [Color] {
+        hexes.compactMap { Color(hex: $0) }
+    }
+}
+
+// MARK: - Helpers
+
+private func staticGradientView(colors: [Color]) -> some View {
     LinearGradient(
-        gradient: Gradient(colors: [
-            Color(UIColor.systemBackground),
-            Color(UIColor.secondarySystemBackground)
-        ]),
+        gradient: Gradient(colors: colors.ensureMinimumCount()),
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -79,30 +130,33 @@ struct ThemedBackground: View {
     var body: some View {
         Group {
             switch style {
-            case .staticGradient:
-                staticBackgroundGradient()
+            case .staticGradient(let colors):
+                staticGradientView(colors: colors)
                     .ignoresSafeArea()
-            case .animatedGradient:
+            case .animatedGradient(let colors, let speed):
                 if reduceMotion {
-                    staticBackgroundGradient()
+                    staticGradientView(colors: colors)
                         .ignoresSafeArea()
                 } else {
-                    AnimatedGradientBackground()
+                    AnimatedGradientBackground(colors: colors, speed: speed)
                 }
-            case .blobs:
+            case .blobs(let colors, let background):
                 if reduceMotion {
-                    staticBackgroundGradient()
+                    staticGradientView(colors: background.isEmpty ? colors : background)
                         .ignoresSafeArea()
                 } else {
-                    BlobBackground()
+                    BlobBackground(blobColors: colors.ensureMinimumCount(), backgroundColors: background.ensureMinimumCount())
                 }
-            case .particles:
+            case .particles(let particle, let background):
                 if reduceMotion {
-                    staticBackgroundGradient()
+                    staticGradientView(colors: background.ensureMinimumCount())
                         .ignoresSafeArea()
                 } else {
-                    ParticleFieldBackground()
+                    ParticleFieldBackground(particleColor: particle, backgroundColors: background.ensureMinimumCount())
                 }
+            case .customGradient(let colors):
+                staticGradientView(colors: colors)
+                    .ignoresSafeArea()
             }
         }
     }
@@ -112,52 +166,54 @@ struct ThemedBackground: View {
 
 struct BackgroundContainer<Content: View>: View {
     @AppStorage("appTheme") private var rawTheme: String = AppTheme.system.rawValue
+    @Environment(\.themeExpansionManager) private var themeExpansion
     let content: Content
     
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
     
-    private var theme: AppTheme {
-        AppTheme(rawValue: rawTheme) ?? .system
+    private var backgroundStyle: BackgroundStyle {
+        themeExpansion?.backgroundStyle(for: rawTheme) ?? AppTheme.system.backgroundStyle
+    }
+    
+    private var preferredScheme: ColorScheme? {
+        themeExpansion?.preferredColorScheme(for: rawTheme)
     }
     
     var body: some View {
         ZStack {
-            ThemedBackground(style: theme.backgroundStyle)
+            ThemedBackground(style: backgroundStyle)
                 .ignoresSafeArea()
             content
         }
-        .preferredColorScheme(theme.preferredColorScheme) // nil means no override
+        .preferredColorScheme(preferredScheme)
     }
 }
 
 // MARK: - Animated backgrounds
 
 private struct AnimatedGradientBackground: View {
-    @State private var t: Double = 0
+    let colors: [Color]
+    let speed: Double
     
     var body: some View {
         TimelineView(.animation) { timeline in
             let now = timeline.date.timeIntervalSinceReferenceDate
-            let speed = 0.15
             let phase = now * speed
-            
-            let c1 = Color(hue: (sin(phase) * 0.5 + 0.5), saturation: 0.55, brightness: 0.45)
-            let c2 = Color(hue: (sin(phase + .pi * 0.66) * 0.5 + 0.5), saturation: 0.75, brightness: 0.35)
-            let c3 = Color(hue: (sin(phase + .pi * 1.33) * 0.5 + 0.5), saturation: 0.65, brightness: 0.30)
-            
-            let angle = Angle(degrees: (sin(phase * 0.7) * 45) + 45)
-            
-            AngularGradient(colors: [c1, c2, c3, c1], center: .center, angle: angle)
-                .saturation(1.0)
-                .brightness(0.0)
-                .opacity(0.9)
+            let rotation = Angle(degrees: phase.truncatingRemainder(dividingBy: 360) * 45)
+            let gradientColors = colors.ensureMinimumCount()
+
+            Rectangle()
+                .fill(
+                    AngularGradient(colors: gradientColors + [gradientColors.first!], center: .center, angle: .degrees(0))
+                )
+                .hueRotation(.degrees(phase.truncatingRemainder(dividingBy: 360) * 30))
+                .rotationEffect(rotation)
+                .scaleEffect(1.2)
                 .ignoresSafeArea()
                 .overlay(
-                    LinearGradient(colors: [.black.opacity(0.25), .clear],
-                                   startPoint: .top,
-                                   endPoint: .bottom)
+                    LinearGradient(colors: [.black.opacity(0.25), .clear], startPoint: .top, endPoint: .bottom)
                         .ignoresSafeArea()
                 )
         }
@@ -165,39 +221,41 @@ private struct AnimatedGradientBackground: View {
 }
 
 private struct BlobBackground: View {
+    let blobColors: [Color]
+    let backgroundColors: [Color]
     @State private var t: CGFloat = 0
     
     var body: some View {
         Canvas { ctx, size in
-            let baseColors: [Color] = [
-                .blue.opacity(0.35),
-                .purple.opacity(0.35),
-                .pink.opacity(0.35),
-                .cyan.opacity(0.35)
-            ]
-            
-            let blobs = 6
+            let blobs = max(blobColors.count, 4)
             let radius = min(size.width, size.height) * 0.45
             
             for i in 0..<blobs {
+                let color = blobColors[i % blobColors.count].opacity(0.32)
                 let p = CGFloat(i) / CGFloat(blobs)
-                let angle = t * (0.5 + 0.1 * CGFloat(i)) + p * .pi * 2
-                let r = radius * (0.4 + 0.2 * sin(t + CGFloat(i)))
+                let angle = t * (0.45 + 0.08 * CGFloat(i)) + p * .pi * 2
+                let r = radius * (0.38 + 0.18 * sin(t + CGFloat(i)))
                 
                 let x = size.width  * 0.5 + cos(angle) * r
-                let y = size.height * 0.5 + sin(angle * 0.9) * r * 0.7
+                let y = size.height * 0.5 + sin(angle * 0.92) * r * 0.72
                 
                 var path = Path()
                 path.addEllipse(in: CGRect(x: x - 140, y: y - 140, width: 280, height: 280))
                 
-                ctx.addFilter(.blur(radius: 40))
-                ctx.fill(path, with: .color(baseColors[i % baseColors.count]))
+                ctx.addFilter(.blur(radius: 42))
+                ctx.fill(path, with: .color(color))
             }
         }
-        .background(staticBackgroundGradient())
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: backgroundColors.ensureMinimumCount()),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.linear(duration: 12).repeatForever(autoreverses: false)) {
+            withAnimation(.linear(duration: 14).repeatForever(autoreverses: false)) {
                 t = .pi * 2
             }
         }
@@ -213,6 +271,8 @@ private struct ParticleFieldBackground: View {
         var opacity: Double
     }
     
+    let particleColor: Color
+    let backgroundColors: [Color]
     @State private var particles: [Particle] = []
     private let count = 120
     
@@ -220,8 +280,12 @@ private struct ParticleFieldBackground: View {
         GeometryReader { geo in
             TimelineView(.animation) { _ in
                 ZStack {
-                    staticBackgroundGradient()
-                        .ignoresSafeArea()
+                    LinearGradient(
+                        gradient: Gradient(colors: backgroundColors.ensureMinimumCount()),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
                     
                     Canvas { ctx, size in
                         for p in particles {
@@ -229,9 +293,9 @@ private struct ParticleFieldBackground: View {
                                                                 y: p.position.y,
                                                                 width: p.size,
                                                                 height: p.size))
-                            ctx.addFilter(.blur(radius: 1.2))
+                            ctx.addFilter(.blur(radius: 1.1))
                             ctx.opacity = p.opacity
-                            ctx.fill(circle, with: .color(.white.opacity(0.85)))
+                            ctx.fill(circle, with: .color(particleColor.opacity(0.9)))
                         }
                     }
                 }
@@ -241,10 +305,10 @@ private struct ParticleFieldBackground: View {
                             Particle(
                                 position: CGPoint(x: .random(in: 0...geo.size.width),
                                                   y: .random(in: 0...geo.size.height)),
-                                velocity: CGVector(dx: .random(in: -0.3...0.3),
-                                                   dy: .random(in: -0.3...0.3)),
-                                size: .random(in: 1.5...3.5),
-                                opacity: .random(in: 0.15...0.45)
+                                velocity: CGVector(dx: .random(in: -0.28...0.28),
+                                                   dy: .random(in: -0.28...0.28)),
+                                size: .random(in: 1.6...3.8),
+                                opacity: .random(in: 0.20...0.45)
                             )
                         }
                     }
@@ -279,5 +343,13 @@ private struct ParticleFieldBackground: View {
             }
         }
         .ignoresSafeArea()
+    }
+}
+
+private extension Array where Element == Color {
+    func ensureMinimumCount() -> [Color] {
+        if isEmpty { return [.blue, .purple] }
+        if count == 1 { return [self[0], self[0].opacity(0.6)] }
+        return self
     }
 }

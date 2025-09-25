@@ -540,7 +540,7 @@ enum ManagerSection: String, CaseIterable, Identifiable {
 
 struct GlassLiquidTabSwitcher: View {
     @Binding var selection: ManagerSection
-    var accent: Color = .white
+    var accent: Color = .blue
     var height: CGFloat = 56
     
     private let pad: CGFloat = 6
@@ -685,8 +685,9 @@ private struct ManageCertsView: View {
 
 struct IPAAppManagerView: View {
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
+    @Environment(\.themeExpansionManager) private var themeExpansion
     private var accent: Color {
-        customAccentColorHex.isEmpty ? .white : Color(hex: customAccentColorHex) ?? .white
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
     }
     
     @StateObject private var mgr = AppSignerManager()

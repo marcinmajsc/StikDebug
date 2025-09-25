@@ -17,20 +17,22 @@ struct SettingsView: View {
     @AppStorage("enablePiP") private var enablePiP = false
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
-    private var currentTheme: AppTheme { AppTheme(rawValue: appThemeRaw) ?? .system }
+    @Environment(\.themeExpansionManager) private var themeExpansion
+    private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
+    private var preferredScheme: ColorScheme? { themeExpansion?.preferredColorScheme(for: appThemeRaw) }
     
     @State private var isShowingPairingFilePicker = false
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var showIconPopover = false
     @State private var showPairingFileMessage = false
-    @State private var pairingFileIsValid = false
     @State private var isImportingFile = false
     @State private var importProgress: Float = 0.0
+    @State private var pairingStatusMessage: String? = nil
+    @State private var showRemovePairingFileDialog = false
     @State private var is_lc = false
     @State private var showColorPickerPopup = false
-    
-    @State private var showingConsoleLogsView = false
+
     @State private var showingDisplayView = false
     
     private var appVersion: String {
@@ -39,8 +41,15 @@ struct SettingsView: View {
     }
     
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty { return .white }
-        return Color(hex: customAccentColorHex) ?? .white
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
+    }
+
+    private var currentThemeName: String {
+        AppTheme(rawValue: appThemeRaw)?.displayName ?? "Default"
+    }
+
+    private var accentColorDescription: String {
+        customAccentColorHex.isEmpty ? "System Blue" : customAccentColorHex.uppercased()
     }
     // Developer profile image URLs
     private let developerProfiles: [String: String] = [
@@ -57,7 +66,7 @@ struct SettingsView: View {
         NavigationStack {
             ZStack {
                 // Subtle depth gradient background
-                ThemedBackground(style: currentTheme.backgroundStyle)
+                ThemedBackground(style: backgroundStyle)
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -112,10 +121,12 @@ struct SettingsView: View {
                 }
                 
                 // Success toast after import
-                if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
+                if let pairingStatusMessage,
+                   showPairingFileMessage,
+                   !isImportingFile {
                     VStack {
                         Spacer()
-                        Text(NSLocalizedString("✓ Pairing file successfully imported", comment: ""))
+                        Text(pairingStatusMessage)
                             .font(.footnote.weight(.semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -128,10 +139,11 @@ struct SettingsView: View {
                     .animation(.easeInOut(duration: 0.25), value: showPairingFileMessage)
                 }
             }
-            .navigationTitle(NSLocalizedString("Settings", comment: ""))
+            .navigationTitle("Settings")
         }
-        // Force a white tint in Settings, overriding any global/user tint
-        .tint(Color.white)
+        // Match controls to the active accent color (defaults to blue)
+        .tint(accentColor)
+        .preferredColorScheme(preferredScheme)
         .fileImporter(
             isPresented: $isShowingPairingFilePicker,
             allowedContentTypes: [UTType(filenameExtension: "mobiledevicepairing", conformingTo: .data)!, .propertyList],
@@ -149,14 +161,15 @@ struct SettingsView: View {
                         if fileManager.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path) {
                             try fileManager.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
                         }
-                        
+
                         try fileManager.copyItem(at: url, to: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
-                        print(NSLocalizedString("File copied successfully!", comment: ""))
+                        print(NSLocalizedString("File copied successfully!", comment: "Settings pairing file copy success"))
                         
                         DispatchQueue.main.async {
                             isImportingFile = true
                             importProgress = 0.0
-                            pairingFileIsValid = false
+                            pairingStatusMessage = nil
+                            showPairingFileMessage = false
                         }
                         
                         let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
@@ -166,17 +179,6 @@ struct SettingsView: View {
                                 } else {
                                     timer.invalidate()
                                     isImportingFile = false
-                                    pairingFileIsValid = true
-                                    
-                                    withAnimation {
-                                        showPairingFileMessage = true
-                                    }
-                                    
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                        withAnimation {
-                                            showPairingFileMessage = false
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -185,20 +187,19 @@ struct SettingsView: View {
                         startHeartbeatInBackground()
                         
                     } catch {
-                        print(String(format: NSLocalizedString("Error copying file: %@", comment: ""), String(describing: error)))
+                        print(String(format: NSLocalizedString("Error copying file: %@", comment: "Settings pairing file copy failure"), String(describing: error)))
                     }
                 } else {
-                    print(NSLocalizedString("Source file does not exist.", comment: ""))
+                    print(NSLocalizedString("Source file does not exist.", comment: "Settings pairing file missing"))
                 }
                 
                 if accessing {
                     url.stopAccessingSecurityScopedResource()
                 }
             case .failure(let error):
-                print(String(format: NSLocalizedString("Failed to import file: %@", comment: ""), String(describing: error)))
+                print(String(format: NSLocalizedString("Failed to import file: %@", comment: "Settings pairing file import failure"), String(describing: error)))
             }
         }
-        .preferredColorScheme(.dark)
     }
     
     // MARK: - Cards
@@ -217,7 +218,7 @@ struct SettingsView: View {
                                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
                         )
                 }
-                Text("StikDebug")
+                Text("StikDebug".localized)
                     .font(.title2.weight(.semibold))
                     .foregroundColor(.primary)
             }
@@ -228,17 +229,38 @@ struct SettingsView: View {
     
     private var appearanceCard: some View {
         glassCard {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(NSLocalizedString("Appearance", comment: ""))
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Appearance".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
-                
+
+                HStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(accentColor)
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(currentThemeName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
+                        Text("Accent · \(accentColorDescription)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+
                 Button(action: { showingDisplayView = true }) {
                     HStack {
                         Image(systemName: "paintbrush")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.85))
-                        Text(NSLocalizedString("Display", comment: ""))
+                        Text("Customize Display".localized)
                             .foregroundColor(.primary.opacity(0.85))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -251,15 +273,18 @@ struct SettingsView: View {
             .padding(4)
         }
         .sheet(isPresented: $showingDisplayView) {
-            DisplayView()
-                .preferredColorScheme(.dark)
+            if let manager = themeExpansion {
+                DisplayView().themeExpansionManager(manager)
+            } else {
+                DisplayView()
+            }
         }
     }
     
     private var pairingCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text(NSLocalizedString("Pairing File", comment: ""))
+                Text("Pairing File".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -269,7 +294,7 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: "doc.badge.plus")
                             .font(.system(size: 18))
-                        Text(NSLocalizedString("Import New Pairing File", comment: ""))
+                        Text("Import New Pairing File".localized)
                             .fontWeight(.medium)
                     }
                     .frame(maxWidth: .infinity)
@@ -282,10 +307,10 @@ struct SettingsView: View {
                     )
                 }
                 
-                if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
+                if showPairingFileMessage && !isImportingFile {
                     HStack {
                         Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-                        Text(NSLocalizedString("Pairing file successfully imported", comment: ""))
+                        Text("Pairing file successfully imported".localized)
                             .font(.callout)
                             .foregroundColor(.green)
                         Spacer()
@@ -300,13 +325,13 @@ struct SettingsView: View {
     private var behaviorCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 16) {
-                Text(NSLocalizedString("Behavior", comment: ""))
+                Text("Behavior".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
                 
-                Toggle(NSLocalizedString("Run Default Script After Connecting", comment: ""), isOn: $useDefaultScript)
+                Toggle("Run Default Script After Connecting", isOn: $useDefaultScript)
                     .tint(accentColor)
-                Toggle(NSLocalizedString("Picture in Picture", comment: ""), isOn: $enablePiP)
+                Toggle("Picture in Picture", isOn: $enablePiP)
                     .tint(accentColor)
             }
             .onChange(of: enableAdvancedOptions) { _, newValue in
@@ -328,31 +353,16 @@ struct SettingsView: View {
     private var advancedCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text(NSLocalizedString("Advanced", comment: ""))
+                Text("Advanced".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
-                
-                Button(action: { showingConsoleLogsView = true }) {
-                    HStack {
-                        Image(systemName: "terminal")
-                            .font(.system(size: 18))
-                            .foregroundColor(.primary.opacity(0.8))
-                        Text(NSLocalizedString("System Logs", comment: ""))
-                            .foregroundColor(.primary.opacity(0.8))
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.vertical, 8)
-                }
                 
                 Button(action: { openAppFolder() }) {
                     HStack {
                         Image(systemName: "folder")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text(NSLocalizedString("App Folder", comment: ""))
+                        Text("App Folder".localized)
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -363,16 +373,12 @@ struct SettingsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingConsoleLogsView) {
-            ConsoleLogsView()
-                .preferredColorScheme(.dark)
-        }
     }
     
     private var helpCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text(NSLocalizedString("Help", comment: ""))
+                Text("Help".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -385,7 +391,7 @@ struct SettingsView: View {
                         Image(systemName: "questionmark.circle")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text(NSLocalizedString("Pairing File Guide", comment: ""))
+                        Text("Pairing File Guide".localized)
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                     }
@@ -401,7 +407,7 @@ struct SettingsView: View {
                         Image(systemName: "questionmark.circle")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text(NSLocalizedString("Need support? Join the Discord!", comment: ""))
+                        Text("Need support? Join the Discord!".localized)
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                     }
@@ -412,7 +418,7 @@ struct SettingsView: View {
                     Image(systemName: "shield.slash")
                         .font(.system(size: 18))
                         .foregroundColor(.primary.opacity(0.8))
-                    Text(NSLocalizedString("You can turn off the VPN in the Settings app.", comment: ""))
+                    Text("You can turn off the VPN in the Settings app.".localized)
                         .foregroundColor(.secondary)
                 }
                 .padding(.top, 4)
@@ -424,7 +430,7 @@ struct SettingsView: View {
         let txmLabel = ProcessInfo.processInfo.hasTXM ? "TXM" : "Non TXM"
         return HStack {
             Spacer()
-            Text(String(format: NSLocalizedString("Version %@ • iOS %@ • %@", comment: "App version • iOS version • TXM label"), appVersion, UIDevice.current.systemVersion, txmLabel))
+            Text("Version \(appVersion) • iOS \(UIDevice.current.systemVersion) • \(txmLabel)")
                 .font(.footnote)
                 .foregroundColor(.secondary)
             Spacer()
@@ -453,7 +459,7 @@ struct SettingsView: View {
         selectedAppIcon = iconName
         UIApplication.shared.setAlternateIconName(iconName == "AppIcon" ? nil : iconName) { error in
             if let error = error {
-                print(String(format: NSLocalizedString("Error changing app icon: %@", comment: ""), error.localizedDescription))
+                print("Error changing app icon: \(error.localizedDescription)")
             }
         }
     }
@@ -485,7 +491,7 @@ struct SettingsView: View {
             if let url = URL(string: path) {
                 UIApplication.shared.open(url, options: [:]) { success in
                     if !success {
-                        print(NSLocalizedString("Failed to open app folder", comment: ""))
+                        print("Failed to open app folder")
                     }
                 }
             }
@@ -549,14 +555,13 @@ struct LinkRow: View {
             }
         }
         .padding(.vertical, 8)
-        .preferredColorScheme(.dark)
     }
 }
 
 struct ConsoleLogsView_Preview: PreviewProvider {
     static var previews: some View {
         ConsoleLogsView()
-            .preferredColorScheme(.dark)
+            .themeExpansionManager(ThemeExpansionManager(previewUnlocked: true))
     }
 }
 
