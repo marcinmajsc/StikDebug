@@ -115,7 +115,7 @@ struct HomeView: View {
 
                 if isImportingFile {
                     Color.black.opacity(0.35).ignoresSafeArea()
-                    ProgressView("Processing pairing file…")
+                    ProgressView(NSLocalizedString("Processing pairing file…", comment: ""))
                         .padding(16)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -129,16 +129,16 @@ struct HomeView: View {
                 }
 
                 if showPairingFileMessage && pairingFileIsValid && !isImportingFile {
-                    toast("✓ Pairing file successfully imported")
+                    toast(NSLocalizedString("✓ Pairing file successfully imported", comment: ""))
                 }
                 if justCopied {
-                    toast("Copied")
+                    toast(NSLocalizedString("Copied", comment: ""))
                 }
                 if let message = systemLaunchMessage {
                     toast(message)
                 }
             }
-            .navigationTitle("Home")
+            .navigationTitle(NSLocalizedString("Home", comment: "Home screen title"))
         }
         .preferredColorScheme(preferredScheme)
         .onAppear {
@@ -208,12 +208,12 @@ struct HomeView: View {
                         }
                         RunLoop.current.add(progressTimer, forMode: .common)
                     } catch {
-                        print("Error copying file: \(error)")
+                        print(String(format: NSLocalizedString("Error copying file: %@", comment: "Pairing file copy failure"), String(describing: error)))
                     }
                 }
                 if accessing { url.stopAccessingSecurityScopedResource() }
             case .failure(let error):
-                print("Failed to import file: \(error)")
+                print(String(format: NSLocalizedString("Failed to import file: %@", comment: "Pairing file import failure"), String(describing: error)))
             }
         }
         .sheet(isPresented: $showingConsoleLogsView) {
@@ -283,7 +283,7 @@ struct HomeView: View {
                     RunJSView(model: jsModel)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
-                                Button("Done") { scriptViewShow = false }
+                                Button(NSLocalizedString("Done", comment: "")) { scriptViewShow = false }
                             }
                         }
                         .navigationTitle(selectedScript)
@@ -366,7 +366,7 @@ struct HomeView: View {
                     StatusGlyph(icon: summary.icon, tint: summary.tint)
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Welcome, \(username)")
+                        Text(String(format: NSLocalizedString("Welcome, %@", comment: "Greeting shown on the home screen"), username))
                             .font(.system(.title2, design: .rounded).weight(.bold))
                             .foregroundStyle(.primary)
 
@@ -399,7 +399,7 @@ struct HomeView: View {
 
                     if pairingFileExists && enableAdvancedOptions {
                         Button(action: { showPIDSheet = true }) {
-                            secondaryButtonLabel(icon: "number.circle", title: "Connect by PID")
+                            secondaryButtonLabel(icon: "number.circle", title: NSLocalizedString("Connect by PID", comment: ""))
                         }
                         .disabled(isProcessing)
                     }
@@ -417,8 +417,8 @@ struct HomeView: View {
     private var readinessSummary: ReadinessSummary {
         if isValidatingPairingFile {
             return .init(
-                title: "Validating pairing file",
-                subtitle: "Hang tight while we verify the pairing file from your trusted computer.",
+                title: "Validating pairing file".localized,
+                subtitle: "Hang tight while we verify the pairing file from your trusted computer.".localized,
                 icon: "hourglass.circle.fill",
                 tint: .orange
             )
@@ -426,14 +426,14 @@ struct HomeView: View {
         if !pairingFileExists {
             if pairingFilePresentOnDisk {
                 return .init(
-                    title: "Pairing file needs attention",
-                    subtitle: "We found a pairing file but couldn’t read it.",
+                    title: "Pairing file needs attention".localized,
+                    subtitle: "We found a pairing file but couldn’t read it.".localized,
                     icon: "doc.badge.exclamationmark",
                     tint: .yellow
                 )
             }
             return .init(
-                title: "Import your pairing file",
+                title: "Import your pairing file".localized,
                 subtitle: "",
                 icon: "doc.badge.plus",
                 tint: .orange
@@ -441,7 +441,7 @@ struct HomeView: View {
         }
         if !ddiMounted {
             return .init(
-                title: "Mount the Developer Disk Image",
+                title: "Mount the Developer Disk Image".localized,
                 subtitle: "",
                 icon: "externaldrive.badge.exclamationmark",
                 tint: .yellow
@@ -449,33 +449,39 @@ struct HomeView: View {
         }
         if tunnel.tunnelStatus != .connected {
             return .init(
-                title: "Connect the VPN",
-                subtitle: "Tap Allow when iOS prompts you, then flip the toggle in Settings if needed.",
+                title: "Connect the VPN".localized,
+                subtitle: "Tap Allow when iOS prompts you, then flip the toggle in Settings if needed.".localized,
                 icon: "lock.slash",
                 tint: .orange
             )
         }
         if !heartbeatOK {
             return .init(
-                title: "Waiting for heartbeat",
-                subtitle: "StikDebug is reaching out to your device. We’ll connect automatically once it responds.",
+                title: "Waiting for heartbeat".localized,
+                subtitle: "StikDebug is reaching out to your device. We’ll connect automatically once it responds.".localized,
                 icon: "waveform.path.ecg",
                 tint: .orange
             )
         }
         return .init(
-            title: "Ready when you are",
-            subtitle: "Everything is ready. Select an app to start debugging in seconds.",
+            title: "Ready when you are".localized,
+            subtitle: "Everything is ready. Select an app to start debugging in seconds.".localized,
             icon: "bolt.horizontal.circle.fill",
             tint: .green
         )
     }
 
     private var primaryActionTitle: String {
-        if isValidatingPairingFile { return "Validating…" }
-        if !pairingFileExists { return pairingFilePresentOnDisk ? "Re-import Pairing File" : "Import Pairing File" }
-        if !ddiMounted { return "Mount Developer Disk Image" }
-        return "Connect by App"
+        if isValidatingPairingFile { return NSLocalizedString("Validating…", comment: "Primary action while validating the pairing file") }
+        if !pairingFileExists {
+            return pairingFilePresentOnDisk
+                ? NSLocalizedString("Re-import Pairing File", comment: "Primary action when reimporting pairing file")
+                : NSLocalizedString("Import Pairing File", comment: "Primary action to import pairing file")
+        }
+        if !ddiMounted {
+            return NSLocalizedString("Mount Developer Disk Image", comment: "Primary action when developer disk image is missing")
+        }
+        return NSLocalizedString("Connect by App", comment: "Primary action to connect via app")
     }
 
     private var primaryActionIcon: String {
@@ -491,34 +497,34 @@ struct HomeView: View {
 
         if isValidatingPairingFile {
             pairingItem = ChecklistItem(
-                title: "Pairing file",
-                subtitle: "Validating pairing file…",
+                title: "Pairing file".localized,
+                subtitle: "Validating pairing file…".localized,
                 status: .waiting,
                 actionTitle: nil,
                 action: nil
             )
         } else if pairingFileExists {
             pairingItem = ChecklistItem(
-                title: "Pairing file",
-                subtitle: "Imported and valid.",
+                title: "Pairing file".localized,
+                subtitle: "Imported and valid.".localized,
                 status: .ready,
                 actionTitle: nil,
                 action: nil
             )
         } else if pairingFilePresentOnDisk {
             pairingItem = ChecklistItem(
-                title: "Pairing file",
-                subtitle: "We couldn’t read the pairing file that’s on disk. Re-import it from your trusted computer.",
+                title: "Pairing file".localized,
+                subtitle: "We couldn’t read the pairing file that’s on disk. Re-import it from your trusted computer.".localized,
                 status: .attention,
-                actionTitle: "Re-import",
+                actionTitle: "Re-import".localized,
                 action: { isShowingPairingFilePicker = true }
             )
         } else {
             pairingItem = ChecklistItem(
-                title: "Pairing file",
-                subtitle: "Import the pairing file generated from your trusted computer.",
+                title: "Pairing file".localized,
+                subtitle: "Import the pairing file generated from your trusted computer.".localized,
                 status: .actionRequired,
-                actionTitle: "Import",
+                actionTitle: "Import".localized,
                 action: { isShowingPairingFilePicker = true }
             )
         }
@@ -526,22 +532,22 @@ struct HomeView: View {
         return [
             pairingItem,
             ChecklistItem(
-                title: "Developer Disk Image",
-                subtitle: ddiMounted ? "Mounted successfully." : "",
+                title: "Developer Disk Image".localized,
+                subtitle: ddiMounted ? "Mounted successfully.".localized : "",
                 status: ddiMounted ? .ready : .attention,
                 actionTitle: nil,
                 action: nil
             ),
             ChecklistItem(
-                title: "VPN tunnel",
-                subtitle: vpnConnected ? "Active." : "Connect the StikDebug VPN from the Settings app if it’s not already on.",
+                title: "VPN tunnel".localized,
+                subtitle: vpnConnected ? "Active.".localized : "Connect the StikDebug VPN from the Settings app if it’s not already on.".localized,
                 status: vpnConnected ? .ready : .attention,
                 actionTitle: nil,
                 action: nil
             ),
             ChecklistItem(
-                title: "Heartbeat",
-                subtitle: heartbeatOK ? "Active." : "We retry automatically—leave the app open for a moment.",
+                title: "Heartbeat".localized,
+                subtitle: heartbeatOK ? "Active.".localized : "We retry automatically—leave the app open for a moment.".localized,
                 status: heartbeatOK ? .ready : .waiting,
                 actionTitle: nil,
                 action: nil
@@ -552,7 +558,7 @@ struct HomeView: View {
     private var pairingImportProgressView: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("Processing pairing file…")
+                Text("Processing pairing file…".localized)
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -581,7 +587,7 @@ struct HomeView: View {
     private var pairingSuccessMessage: some View {
         HStack(spacing: 10) {
             StatusDot(color: .green)
-            Text("Pairing file successfully imported")
+            Text("Pairing file successfully imported".localized)
                 .font(.system(.callout, design: .rounded))
                 .foregroundStyle(.green)
             Spacer(minLength: 0)
@@ -640,7 +646,7 @@ struct HomeView: View {
         homeCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
-                    Text("Quick Connect")
+                    Text("Quick Connect".localized)
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(.primary)
 
@@ -651,20 +657,20 @@ struct HomeView: View {
                     }
                 }
 
-                Text("Favorites and recents stay within reach so you can enable debug with ease.")
+                Text("Favorites and recents stay within reach so you can enable debug with ease.".localized)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
                 if quickConnectItems.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Pin apps from the Installed Apps list to see them here.")
+                        Text("Pin apps from the Installed Apps list to see them here.".localized)
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
                         Button {
                             isShowingInstalledApps = true
                         } label: {
-                            secondaryButtonLabel(icon: "star", title: "Choose Favorites")
+                            secondaryButtonLabel(icon: "star", title: "Choose Favorites".localized)
                         }
                         .buttonStyle(.plain)
                     }
@@ -689,7 +695,7 @@ struct HomeView: View {
                 }
 
                 if !canConnectByApp {
-                    Text("Finish the pairing and mounting steps above to enable quick launches.")
+                    Text("Finish the pairing and mounting steps above to enable quick launches.".localized)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -822,7 +828,7 @@ struct HomeView: View {
     private var toolsCard: some View {
         homeCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Tools")
+                Text("Tools".localized)
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
@@ -830,13 +836,13 @@ struct HomeView: View {
                     Button {
                         showingConsoleLogsView = true
                     } label: {
-                        whiteCardButtonLabel(icon: "terminal", title: "Open Console")
+                        whiteCardButtonLabel(icon: "terminal", title: NSLocalizedString("Open Console", comment: ""))
                     }
 
              //       Button {
               //          isShowingInstalledApps = true
               //      } label: {
-               //         secondaryButtonLabel(icon: "list.bullet", title: "Installed Apps")
+               //         secondaryButtonLabel(icon: "list.bullet", title: "Installed Apps".localized)
                //     }
                //     .buttonStyle(.plain)
                 }
@@ -847,17 +853,17 @@ struct HomeView: View {
     private var tipsCard: some View {
         homeCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Tips")
+                Text("Tips".localized)
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
                 if !pairingFileExists {
-                    tipRow(systemImage: "doc.badge.plus", title: "Pairing file required", message: "Import your device’s pairing file to begin.")
+                    tipRow(systemImage: "doc.badge.plus", title: "Pairing file required".localized, message: "Import your device’s pairing file to begin.")
                 }
                 if pairingFileExists && !ddiMounted {
-                    tipRow(systemImage: "externaldrive.badge.exclamationmark", title: "Developer Disk Image not mounted", message: "Go to Settings → Developer Disk Image and ensure it’s mounted.")
+                    tipRow(systemImage: "externaldrive.badge.exclamationmark", title: "Developer Disk Image not mounted".localized, message: "Go to Settings → Developer Disk Image and ensure it’s mounted.")
                 }
-                tipRow(systemImage: "lock.shield", title: "Local only", message: "StikDebug runs entirely on-device. No data leaves your device.")
+                tipRow(systemImage: "lock.shield", title: "Local only".localized, message: "StikDebug runs entirely on-device. No data leaves your device.")
 
                 Divider().background(Color.white.opacity(0.1))
 
@@ -872,9 +878,9 @@ struct HomeView: View {
                             .font(.system(size: 18, weight: .semibold))
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Pairing File Guide")
+                            Text("Pairing File Guide".localized)
                                 .font(.subheadline.weight(.semibold))
-                            Text("Step-by-step instructions from the community wiki.")
+                            Text("Step-by-step instructions from the community wiki.".localized)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -998,7 +1004,7 @@ struct HomeView: View {
     
     private func startJITInBackground(bundleID: String? = nil, pid : Int? = nil, scriptData: Data? = nil, scriptName: String? = nil, triggeredByURLScheme: Bool = false) {
         isProcessing = true
-        LogManager.shared.addInfoLog("Starting Debug for \(bundleID ?? String(pid ?? 0))")
+        LogManager.shared.addInfoLog(String(format: NSLocalizedString("Starting Debug for %@", comment: "Log entry when starting debug"), bundleID ?? String(pid ?? 0)))
         
         DispatchQueue.global(qos: .background).async {
             var scriptData = scriptData
@@ -1044,7 +1050,7 @@ struct HomeView: View {
             
             if success {
                 DispatchQueue.main.async {
-                    LogManager.shared.addInfoLog("Debug process completed for \(bundleID ?? String(pid ?? 0))")
+                    LogManager.shared.addInfoLog(String(format: NSLocalizedString("Debug process completed for %@", comment: "Log entry when debug finishes"), bundleID ?? String(pid ?? 0)))
                 }
             }
             isProcessing = false
@@ -1063,10 +1069,10 @@ struct HomeView: View {
             DispatchQueue.main.async {
                 launchingSystemApps.remove(item.bundleID)
                 if success {
-                    LogManager.shared.addInfoLog("Launch request sent for \(item.bundleID)")
+                    LogManager.shared.addInfoLog(String(format: NSLocalizedString("Launch request sent for %@", comment: "Log entry when system app launch succeeds"), item.bundleID))
                     systemLaunchMessage = String(format: "Launch requested: %@".localized, item.displayName)
                 } else {
-                    LogManager.shared.addErrorLog("Failed to launch \(item.bundleID)")
+                    LogManager.shared.addErrorLog(String(format: NSLocalizedString("Failed to launch %@", comment: "Log entry when system app launch fails"), item.bundleID))
                     systemLaunchMessage = String(format: "Failed to launch %@".localized, item.displayName)
                 }
                 scheduleSystemToastDismiss()
@@ -1122,10 +1128,10 @@ struct HomeView: View {
                 .imageScale(.large)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Important for iOS 26+")
+                Text("Important for iOS 26+".localized)
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.primary)
-                Text("Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time.")
+                Text("Limited compatibility on iOS 26 and later. Some apps may not function as expected yet. We’re actively improving support over time.".localized)
                     .font(.footnote)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1146,7 +1152,7 @@ struct HomeView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Dismiss")
+                .accessibilityLabel(NSLocalizedString("Dismiss", comment: "Dismiss button accessibility label"))
             }
         }
         .padding(14)
@@ -1160,7 +1166,7 @@ struct HomeView: View {
         )
         .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing.")
+        .accessibilityLabel(NSLocalizedString("Important notice for iOS 26 and later. Limited compatibility; improvements are ongoing.", comment: "iOS 26 disclaimer accessibility label"))
     }
 }
 
@@ -1476,9 +1482,9 @@ private struct ConnectByPIDSheet: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 14) {
-                            Text("Enter a Process ID").font(.headline).foregroundColor(.primary)
+                            Text("Enter a Process ID".localized).font(.headline).foregroundColor(.primary)
                             
-                            TextField("e.g. 1234", text: $pidText)
+                            TextField(NSLocalizedString("e.g. 1234", comment: ""), text: $pidText)
                                 .keyboardType(.numberPad)
                                 .textContentType(.oneTimeCode)
                                 .font(.system(.title3, design: .rounded))
@@ -1496,19 +1502,19 @@ private struct ConnectByPIDSheet: View {
 
                             // Paste + Clear row
                             HStack(spacing: 10) {
-                                CapsuleButton(systemName: "doc.on.clipboard", title: "Paste", height: capsuleHeight) {
+                                CapsuleButton(systemName: "doc.on.clipboard", title: "Paste".localized, height: capsuleHeight) {
                                     if let n = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
                                        let v = Int(n), v > 0 {
                                         pidText = String(v)
                                         validate(pidText)
                                         onPasteCopyToast()
                                     } else {
-                                        errorText = "No valid PID on the clipboard."
+                                        errorText = NSLocalizedString("No valid PID on the clipboard.", comment: "Clipboard PID error message")
                                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                     }
                                 }
 
-                                CapsuleButton(systemName: "xmark", title: "Clear", height: capsuleHeight) {
+                                CapsuleButton(systemName: "xmark", title: "Clear".localized, height: capsuleHeight) {
                                     pidText = ""
                                     errorText = nil
                                 }
@@ -1526,7 +1532,7 @@ private struct ConnectByPIDSheet: View {
                             
                             if !recentPIDs.isEmpty {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("Recents")
+                                    Text("Recents".localized)
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundColor(.secondary)
                                     ScrollView(.horizontal, showsIndicators: false) {
@@ -1545,9 +1551,9 @@ private struct ConnectByPIDSheet: View {
                                                         )
                                                 }
                                                 .contextMenu {
-                                                    Button(role: .destructive) {
-                                                        removeRecent(pid)
-                                                    } label: { Label("Remove", systemImage: "trash") }
+                            Button(role: .destructive) {
+                                removeRecent(pid)
+                            } label: { Label("Remove".localized, systemImage: "trash") }
                                                 }
                                             }
                                         }
@@ -1563,7 +1569,7 @@ private struct ConnectByPIDSheet: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "bolt.horizontal.circle").font(.system(size: 20))
-                                    Text("Connect")
+                                    Text("Connect".localized)
                                         .font(.system(.title3, design: .rounded))
                                         .fontWeight(.semibold)
                                 }
@@ -1594,9 +1600,9 @@ private struct ConnectByPIDSheet: View {
                     .padding(.vertical, 30)
                 }
             }
-            .navigationTitle("Connect by PID")
+            .navigationTitle(NSLocalizedString("Connect by PID", comment: "Connect by PID sheet title"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(NSLocalizedString("Cancel", comment: "")) { dismiss() } } }
             .onAppear { focused = true }
         }
     }
@@ -1618,7 +1624,7 @@ private struct ConnectByPIDSheet: View {
     
     private func validate(_ text: String) {
         if text.isEmpty { errorText = nil; return }
-        if Int(text) == nil || Int(text)! <= 0 { errorText = "Please enter a positive number." }
+        if Int(text) == nil || Int(text)! <= 0 { errorText = NSLocalizedString("Please enter a positive number.", comment: "PID validation error") }
         else { errorText = nil }
     }
     private func addRecent(_ pid: Int) {
@@ -1656,11 +1662,7 @@ private struct ConnectByPIDSheet: View {
 
 public extension ProcessInfo {
     var hasTXM: Bool {
-        if isTXMOverridden {
-            return true
-        }
-
-        return {
+        {
             if let boot = FileManager.default.filePath(atPath: "/System/Volumes/Preboot", withLength: 36),
                let file = FileManager.default.filePath(atPath: "\(boot)/boot", withLength: 96) {
                 return access("\(file)/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4", F_OK) == 0
@@ -1670,9 +1672,5 @@ public extension ProcessInfo {
                 }) ?? false
             }
         }()
-    }
-
-    var isTXMOverridden: Bool {
-        UserDefaults.standard.bool(forKey: UserDefaults.Keys.txmOverride)
     }
 }

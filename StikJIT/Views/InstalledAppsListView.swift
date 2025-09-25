@@ -235,13 +235,13 @@ struct InstalledAppsListView: View {
                         Image(systemName: performanceMode ? "bolt.fill" : "bolt.slash.fill")
                             .imageScale(.large)
                             .foregroundStyle(performanceMode ? .yellow : .secondary)
-                            .accessibilityLabel("Toggle Performance Mode")
+                            .accessibilityLabel("Toggle Performance Mode".localized)
                             .accessibilityValue(performanceMode ? "On" : "Off")
                     }
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button(NSLocalizedString("Done", comment: "")) { dismiss() }
                         .fontWeight(.semibold)
                 }
             }
@@ -307,7 +307,9 @@ struct InstalledAppsListView: View {
         .padding(24)
         .glassCard(cornerRadius: 24, material: .thinMaterial, strokeOpacity: 0.12)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(tab == .debuggable ? "No debuggable apps available" : "No launchable apps available")
+        .accessibilityLabel(tab == .debuggable
+            ? NSLocalizedString("No debuggable apps available", comment: "Accessibility label for empty debuggable list")
+            : NSLocalizedString("No launchable apps available", comment: "Accessibility label for empty launch list"))
     }
 
     // MARK: Apps List
@@ -547,7 +549,7 @@ struct InstalledAppsListView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel("Clear search".localized)
+                .accessibilityLabel("Clear search".localized.localized)
             }
         }
         .padding(.horizontal, 14)
@@ -596,7 +598,7 @@ struct InstalledAppsListView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel("Clear search".localized)
+                .accessibilityLabel("Clear search".localized.localized)
             }
         }
         .padding(.horizontal, 14)
@@ -833,11 +835,11 @@ struct AppButton: View {
                 UIPasteboard.general.string = bundleID
                 Haptics.light()
             } label: {
-                Label("Copy Bundle ID", systemImage: "doc.on.doc")
+                Label("Copy Bundle ID".localized, systemImage: "doc.on.doc")
             }
             if enableAdvancedOptions {
                 Button { showScriptPicker = true } label: {
-                    Label("Assign Script", systemImage: "chevron.left.slash.chevron.right")
+                    Label("Assign Script".localized, systemImage: "chevron.left.slash.chevron.right")
                 }
             }
         }
@@ -853,7 +855,7 @@ struct AppButton: View {
                 UIPasteboard.general.string = bundleID
                 Haptics.light()
             } label: {
-                Label("Copy ID", systemImage: "doc.on.doc")
+                Label("Copy ID".localized, systemImage: "doc.on.doc")
             }
         }
         .sheet(isPresented: $showScriptPicker) {
@@ -1094,7 +1096,6 @@ private struct ThemedRowBackground: View {
     var performanceMode: Bool
     var style: BackgroundStyle
     var cornerRadius: CGFloat
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -1150,17 +1151,6 @@ private struct ThemedRowBackground: View {
                 .opacity(0.40)
         case .particles(let particle, _):
             shape.fill(particle.opacity(0.18))
-        case .adaptiveGradient(let light, let dark):
-            let palette = colorScheme == .dark ? dark : light
-            shape
-                .fill(
-                    LinearGradient(
-                        gradient: Gradient(colors: normalized(palette)),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .opacity(0.32)
         }
     }
 

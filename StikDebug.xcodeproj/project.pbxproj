@@ -11,7 +11,6 @@
 		68AA2E4D2E8214A1008342E8 /* StikDebug.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 68AA2E4C2E8214A1008342E8 /* StikDebug.storekit */; };
 		68AD80462E6B65DA00DE9112 /* ZsignSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 68AD80452E6B65DA00DE9112 /* ZsignSwift */; };
 		68AD80482E6B65DA00DE9112 /* zsign in Frameworks */ = {isa = PBXBuildFile; productRef = 68AD80472E6B65DA00DE9112 /* zsign */; };
-		68D1FA402E847E4A0028A0EA /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68D1FA3F2E847E4A0028A0EA /* StoreKit.framework */; };
 		68D569BE2E1B415700A5BA36 /* CodeEditorView in Frameworks */ = {isa = PBXBuildFile; productRef = 68D569BD2E1B415700A5BA36 /* CodeEditorView */; };
 		68D569C02E1B415700A5BA36 /* LanguageSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 68D569BF2E1B415700A5BA36 /* LanguageSupport */; };
 		68E714E62E6AA2B00025610F /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 68E714E52E6AA2B00025610F /* ZIPFoundation */; };
@@ -163,7 +162,6 @@
 				68AD80462E6B65DA00DE9112 /* ZsignSwift in Frameworks */,
 				68AD80482E6B65DA00DE9112 /* zsign in Frameworks */,
 				68D569C02E1B415700A5BA36 /* LanguageSupport in Frameworks */,
-				68D1FA402E847E4A0028A0EA /* StoreKit.framework in Frameworks */,
 				68D569BE2E1B415700A5BA36 /* CodeEditorView in Frameworks */,
 				68E714E62E6AA2B00025610F /* ZIPFoundation in Frameworks */,
 			);
@@ -198,7 +196,6 @@
 			isa = PBXGroup;
 			children = (
 				DC139F862DE97F2000F63846 /* DebugWidgetExtension.entitlements */,
-				68AA2E4C2E8214A1008342E8 /* StikDebug.storekit */,
 				DC6F1D392D94EADD0071B2B6 /* StikJIT */,
 				DC6F1D4B2D94EADF0071B2B6 /* StikJITTests */,
 				DC6F1D552D94EADF0071B2B6 /* StikJITUITests */,
@@ -224,7 +221,6 @@
 		DC6F1D752D94EB620071B2B6 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				68D1FA3F2E847E4A0028A0EA /* StoreKit.framework */,
 				DCA690112DAF660E007C91A8 /* NetworkExtension.framework */,
 				DC139F6D2DE97EA400F63846 /* WidgetKit.framework */,
 				DC139F6F2DE97EA400F63846 /* SwiftUI.framework */,
@@ -365,7 +361,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 1620;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					DC139F6B2DE97EA400F63846 = {
 						CreatedOnToolsVersion = 16.2;
@@ -394,6 +390,7 @@
 				en,
 				Base,
 				es,
+				pl,
 			);
 			mainGroup = DC6F1D2E2D94EADD0071B2B6;
 			minimizedProjectReferenceProxies = 1;
@@ -422,10 +419,9 @@
 		DC139F6A2DE97EA400F63846 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				68AA2E4D2E8214A1008342E8 /* StikDebug.storekit in Resources */,
-			);
 			runOnlyForDeploymentPostprocessing = 0;
+            files = (
+			);
 		};
 		DC6F1D352D94EADD0071B2B6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
@@ -527,7 +523,7 @@
 				CODE_SIGN_ENTITLEMENTS = DebugWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DebugWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DebugWidget;
@@ -539,7 +535,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.DebugWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.H9P9ZKGUMR.DebugWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -557,7 +553,7 @@
 				CODE_SIGN_ENTITLEMENTS = DebugWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DebugWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DebugWidget;
@@ -569,7 +565,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.DebugWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.H9P9ZKGUMR.DebugWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -585,6 +581,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -615,6 +612,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -636,6 +634,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -646,6 +645,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -676,6 +676,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -690,6 +691,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -701,10 +703,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = StikJIT/StikJIT.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"StikJIT/Preview Content\"";
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -733,9 +736,10 @@
 					"$(PROJECT_DIR)/StikJIT/idevice",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
-				MARKETING_VERSION = 2.3.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj;
+                                MARKETING_VERSION = 2.3.1;
+                                PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -754,10 +758,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = StikJIT/StikJIT.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"StikJIT/Preview Content\"";
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -786,9 +791,10 @@
 					"$(PROJECT_DIR)/StikJIT/idevice",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
-				MARKETING_VERSION = 2.3.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj;
+                                MARKETING_VERSION = 2.3.1;
+                                PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -805,12 +811,12 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.StikJITTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stik.StikJITTests.H9P9ZKGUMR;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -828,12 +834,12 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.StikJITTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stik.StikJITTests.H9P9ZKGUMR;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
@@ -850,7 +856,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.1;
@@ -895,7 +901,7 @@
 				CODE_SIGN_ENTITLEMENTS = TunnelProv/TunnelProv.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TunnelProv/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TunnelProv;
@@ -907,7 +913,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.TunnelProv;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.H9P9ZKGUMR.TunnelProv;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -923,7 +929,7 @@
 				CODE_SIGN_ENTITLEMENTS = TunnelProv/TunnelProv.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SZ977XLF24;
+				DEVELOPMENT_TEAM = H9P9ZKGUMR;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TunnelProv/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = TunnelProv;
@@ -935,7 +941,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.TunnelProv;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stik.sj.H9P9ZKGUMR.TunnelProv;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -956,7 +962,7 @@
 				DC139F832DE97EA600F63846 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		DC6F1D322D94EADD0071B2B6 /* Build configuration list for PBXProject "StikDebug" */ = {
 			isa = XCConfigurationList;
@@ -965,7 +971,7 @@
 				DC6F1D5B2D94EADF0071B2B6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		DC6F1D5C2D94EADF0071B2B6 /* Build configuration list for PBXNativeTarget "StikDebug" */ = {
 			isa = XCConfigurationList;
@@ -974,7 +980,7 @@
 				DC6F1D5E2D94EADF0071B2B6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		DC6F1D5F2D94EADF0071B2B6 /* Build configuration list for PBXNativeTarget "StikDebugTests" */ = {
 			isa = XCConfigurationList;
@@ -983,7 +989,7 @@
 				DC6F1D612D94EADF0071B2B6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		DC6F1D622D94EADF0071B2B6 /* Build configuration list for PBXNativeTarget "StikDebugUITests" */ = {
 			isa = XCConfigurationList;
@@ -992,7 +998,7 @@
 				DC6F1D642D94EADF0071B2B6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		DCA6901B2DAF660E007C91A8 /* Build configuration list for PBXNativeTarget "TunnelProv" */ = {
 			isa = XCConfigurationList;
@@ -1001,7 +1007,7 @@
 				DCA6901D2DAF660E007C91A8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 

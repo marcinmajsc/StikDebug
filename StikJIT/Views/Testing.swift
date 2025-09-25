@@ -26,17 +26,17 @@ private func c_install_ipa(
 
 private func installErrorMessage(_ code: Int32) -> String {
     switch code {
-    case 0:  return "Success"
-    case 1:  return "Pairing file unreadable"
-    case 2:  return "TCP provider error"
-    case 3:  return "AFC connect error"
-    case 4:  return "IPA unreadable"
-    case 5:  return "AFC open error"
-    case 6:  return "AFC write error"
-    case 7:  return "Install-proxy error"
-    case 8:  return "Device refused IPA"
-    case 9:  return "Invalid IP address"
-    default: return "Unknown (\(code))"
+    case 0:  return NSLocalizedString("Success", comment: "")
+    case 1:  return NSLocalizedString("Pairing file unreadable", comment: "")
+    case 2:  return NSLocalizedString("TCP provider error", comment: "")
+    case 3:  return NSLocalizedString("AFC connect error", comment: "")
+    case 4:  return NSLocalizedString("IPA unreadable", comment: "")
+    case 5:  return NSLocalizedString("AFC open error", comment: "")
+    case 6:  return NSLocalizedString("AFC write error", comment: "")
+    case 7:  return NSLocalizedString("Install-proxy error", comment: "")
+    case 8:  return NSLocalizedString("Device refused IPA", comment: "")
+    case 9:  return NSLocalizedString("Invalid IP address", comment: "")
+    default: return String.localizedStringWithFormat(NSLocalizedString("Unknown (%d)", comment: ""), code)
     }
 }
 

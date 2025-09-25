@@ -20,8 +20,8 @@ struct CustomErrorView: View {
     var showButton: Bool = true
     @State private var opacity: Double = 0
     @State private var scale: CGFloat = 0.8
-    var primaryButtonText: String = "OK"
-    var secondaryButtonText: String = "Cancel"
+    var primaryButtonText: String = NSLocalizedString("OK", comment: "Primary acknowledgement button")
+    var secondaryButtonText: String = NSLocalizedString("Cancel", comment: "Secondary dismissal button")
     var onPrimaryButtonTap: (() -> Void)? = nil
     var onSecondaryButtonTap: (() -> Void)? = nil
     var showSecondaryButton: Bool = false
@@ -29,17 +29,27 @@ struct CustomErrorView: View {
     
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
-    
+    @Environment(\.themeExpansionManager) private var themeExpansion
+
     private var accentColor: Color {
-        if customAccentColorHex.isEmpty { return .blue }
-        return Color(hex: customAccentColorHex) ?? .blue
+        themeExpansion?.resolvedAccentColor(from: customAccentColorHex)
+            ?? (customAccentColorHex.isEmpty
+                ? Color.accentColor
+                : (Color(hex: customAccentColorHex) ?? Color.accentColor))
+    }
+
+    private var primaryButtonForegroundColor: Color {
+        if colorScheme == .dark {
+            return .black
+        }
+        return accentColor.contrastText()
     }
     
     
     var body: some View {
         ZStack {
             Color.black.opacity(0.6)
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
                 .opacity(opacity)
                 .onTapGesture {
                     if showButton {
@@ -68,7 +78,7 @@ struct CustomErrorView: View {
                 
                 Text(title)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(colorScheme == .dark ? .white : .black)
+                    .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
                 
                 Rectangle()
@@ -76,9 +86,9 @@ struct CustomErrorView: View {
                     .foregroundColor(colorScheme == .dark ? .white.opacity(0.2) : .black.opacity(0.2))
                     .padding(.horizontal, 12)
                 
-                Text(LocalizedStringKey(message))
+                Text(message)
                     .font(.system(size: 15, design: .rounded))
-                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
+                    .foregroundColor(.primary.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 12)
@@ -92,12 +102,12 @@ struct CustomErrorView: View {
                         }) {
                             Text(primaryButtonText)
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .foregroundColor(colorScheme == .dark ? .black : .white)
+                                .foregroundColor(primaryButtonForegroundColor)
                                 .frame(height: 38)
                                 .frame(maxWidth: .infinity)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(colorScheme == .dark ? Color.white : accentColor)
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(colorScheme == .dark ? Color.white : accentColor)
                                 )
                         }
                         

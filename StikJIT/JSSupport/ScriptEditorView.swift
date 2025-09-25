@@ -46,10 +46,10 @@ struct ScriptEditorView: View {
                 Divider()
 
                 HStack(spacing: 12) {
-                    WideGlassyButton(title: "Cancel", systemImage: "xmark") {
+                    WideGlassyButton(title: NSLocalizedString("Cancel", comment: ""), systemImage: "xmark") {
                         dismiss()
                     }
-                    WideGlassyButton(title: "Save", systemImage: "checkmark") {
+                    WideGlassyButton(title: NSLocalizedString("Save", comment: ""), systemImage: "checkmark") {
                         saveScript()
                         dismiss()
                     }

@@ -34,19 +34,19 @@ struct MainTabView: View {
             // Main tabs
             TabView(selection: $selection) {
                 HomeView()
-                    .tabItem { Label("Home", systemImage: "house") }
+                    .tabItem { Label(NSLocalizedString("Home", comment: ""), systemImage: "house") }
                     .tag(0)
 
                 ScriptListView()
-                    .tabItem { Label("Scripts", systemImage: "scroll") }
+                    .tabItem { Label(NSLocalizedString("Scripts", comment: ""), systemImage: "scroll") }
                     .tag(1)
 
                 DeviceInfoView()
-                    .tabItem { Label("Device Info", systemImage: "info.circle.fill") }
+                    .tabItem { Label(NSLocalizedString("Device Info", comment: ""), systemImage: "info.circle.fill") }
                     .tag(3)
 
                 SettingsView()
-                    .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                    .tabItem { Label(NSLocalizedString("Settings", comment: ""), systemImage: "gearshape.fill") }
                     .tag(4)
             }
             .id((themeExpansion?.hasThemeExpansion == true) ? customAccentColorHex : "default-accent")
@@ -61,11 +61,11 @@ struct MainTabView: View {
                     Color.black.opacity(0.001).ignoresSafeArea()
 
                     VStack(spacing: 20) {
-                        Text("Update Required")
+                        Text(NSLocalizedString("Update Required", comment: ""))
                             .font(.title.bold())
                             .multilineTextAlignment(.center)
 
-                        Text("A new version (\(latestVersion ?? "unknown")) is available. Please update to continue using the app.")
+                        Text(String(format: NSLocalizedString("A new version (%@) is available. Please update to continue using the app.", comment: ""), latestVersion ?? "unknown"))
                             .multilineTextAlignment(.center)
                             .font(.callout)
                             .foregroundColor(.secondary)
@@ -76,7 +76,7 @@ struct MainTabView: View {
                                 UIApplication.shared.open(url)
                             }
                         }) {
-                            Text("Update Now")
+                            Text(NSLocalizedString("Update Now", comment: ""))
                                 .font(.headline.weight(.semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)

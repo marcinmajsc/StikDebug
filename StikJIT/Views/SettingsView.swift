@@ -15,7 +15,6 @@ struct SettingsView: View {
     @AppStorage("enableAdvancedBetaOptions") private var enableAdvancedBetaOptions = false
     @AppStorage("enableTesting") private var enableTesting = false
     @AppStorage("enablePiP") private var enablePiP = false
-    @AppStorage(UserDefaults.Keys.txmOverride) private var overrideTXMDetection = false
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
     @Environment(\.themeExpansionManager) private var themeExpansion
@@ -88,7 +87,7 @@ struct SettingsView: View {
                 if isImportingFile {
                     Color.black.opacity(0.35).ignoresSafeArea()
                     VStack(spacing: 12) {
-                        ProgressView("Processing pairing file…")
+                        ProgressView(NSLocalizedString("Processing pairing file…", comment: ""))
                         VStack(spacing: 8) {
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
@@ -162,9 +161,9 @@ struct SettingsView: View {
                         if fileManager.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path) {
                             try fileManager.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
                         }
-                        
+
                         try fileManager.copyItem(at: url, to: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
-                        print("File copied successfully!")
+                        print(NSLocalizedString("File copied successfully!", comment: "Settings pairing file copy success"))
                         
                         DispatchQueue.main.async {
                             isImportingFile = true
@@ -188,17 +187,17 @@ struct SettingsView: View {
                         startHeartbeatInBackground()
                         
                     } catch {
-                        print("Error copying file: \(error)")
+                        print(String(format: NSLocalizedString("Error copying file: %@", comment: "Settings pairing file copy failure"), String(describing: error)))
                     }
                 } else {
-                    print("Source file does not exist.")
+                    print(NSLocalizedString("Source file does not exist.", comment: "Settings pairing file missing"))
                 }
                 
                 if accessing {
                     url.stopAccessingSecurityScopedResource()
                 }
             case .failure(let error):
-                print("Failed to import file: \(error)")
+                print(String(format: NSLocalizedString("Failed to import file: %@", comment: "Settings pairing file import failure"), String(describing: error)))
             }
         }
     }
@@ -219,7 +218,7 @@ struct SettingsView: View {
                                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
                         )
                 }
-                Text("StikDebug")
+                Text("StikDebug".localized)
                     .font(.title2.weight(.semibold))
                     .foregroundColor(.primary)
             }
@@ -231,7 +230,7 @@ struct SettingsView: View {
     private var appearanceCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Appearance")
+                Text("Appearance".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
 
@@ -261,7 +260,7 @@ struct SettingsView: View {
                         Image(systemName: "paintbrush")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.85))
-                        Text("Customize Display")
+                        Text("Customize Display".localized)
                             .foregroundColor(.primary.opacity(0.85))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -285,7 +284,7 @@ struct SettingsView: View {
     private var pairingCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Pairing File")
+                Text("Pairing File".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -295,7 +294,7 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: "doc.badge.plus")
                             .font(.system(size: 18))
-                        Text("Import New Pairing File")
+                        Text("Import New Pairing File".localized)
                             .fontWeight(.medium)
                     }
                     .frame(maxWidth: .infinity)
@@ -311,7 +310,7 @@ struct SettingsView: View {
                 if showPairingFileMessage && !isImportingFile {
                     HStack {
                         Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-                        Text("Pairing file successfully imported")
+                        Text("Pairing file successfully imported".localized)
                             .font(.callout)
                             .foregroundColor(.green)
                         Spacer()
@@ -326,25 +325,14 @@ struct SettingsView: View {
     private var behaviorCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Behavior")
+                Text("Behavior".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
-
+                
                 Toggle("Run Default Script After Connecting", isOn: $useDefaultScript)
                     .tint(accentColor)
                 Toggle("Picture in Picture", isOn: $enablePiP)
                     .tint(accentColor)
-                Toggle(isOn: $overrideTXMDetection) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Always Run Scripts")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.primary.opacity(0.9))
-                        Text("Treat this device as TXM-capable to bypass hardware checks.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .tint(accentColor)
             }
             .onChange(of: enableAdvancedOptions) { _, newValue in
                 if !newValue {
@@ -365,16 +353,16 @@ struct SettingsView: View {
     private var advancedCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Advanced")
+                Text("Advanced".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
-
+                
                 Button(action: { openAppFolder() }) {
                     HStack {
                         Image(systemName: "folder")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text("App Folder")
+                        Text("App Folder".localized)
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -390,7 +378,7 @@ struct SettingsView: View {
     private var helpCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Help")
+                Text("Help".localized)
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -403,7 +391,7 @@ struct SettingsView: View {
                         Image(systemName: "questionmark.circle")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text("Pairing File Guide")
+                        Text("Pairing File Guide".localized)
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                     }
@@ -419,7 +407,7 @@ struct SettingsView: View {
                         Image(systemName: "questionmark.circle")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text("Need support? Join the Discord!")
+                        Text("Need support? Join the Discord!".localized)
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                     }
@@ -430,22 +418,16 @@ struct SettingsView: View {
                     Image(systemName: "shield.slash")
                         .font(.system(size: 18))
                         .foregroundColor(.primary.opacity(0.8))
-                    Text("You can turn off the VPN in the Settings app.")
+                    Text("You can turn off the VPN in the Settings app.".localized)
                         .foregroundColor(.secondary)
                 }
                 .padding(.top, 4)
             }
         }
     }
-
+    
     private var versionInfo: some View {
-        let processInfo = ProcessInfo.processInfo
-        let txmLabel: String
-        if processInfo.isTXMOverridden {
-            txmLabel = "TXM (Override)"
-        } else {
-            txmLabel = processInfo.hasTXM ? "TXM" : "Non TXM"
-        }
+        let txmLabel = ProcessInfo.processInfo.hasTXM ? "TXM" : "Non TXM"
         return HStack {
             Spacer()
             Text("Version \(appVersion) • iOS \(UIDevice.current.systemVersion) • \(txmLabel)")
