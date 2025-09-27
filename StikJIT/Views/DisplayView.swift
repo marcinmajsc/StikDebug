@@ -24,7 +24,7 @@ struct AccentColorPicker: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(NSLocalizedString("Accent Color", comment: ""))
+            Text("Accent Color")
                 .font(.headline)
                 .foregroundColor(.primary)
             
@@ -122,7 +122,21 @@ struct DisplayView: View {
                             themeCard
                             customThemesSection
                         } else {
-                            themeExpansionUpsellCard
+                            // Accent preview remains above
+                            accentPreview
+                            
+                            // Built-in + Custom themes previews with paywall centered on top
+                            ZStack(alignment: .center) {
+                                VStack(spacing: 20) {
+                                    themePreview
+                                    customThemesPreview
+                                }
+                                .zIndex(0)
+                                
+                                themeExpansionUpsellCard
+                                    .frame(maxWidth: .infinity) // match other cards’ width
+                                    .zIndex(1)
+                            }
                         }
                         jitOptionsCard
                     }
@@ -133,7 +147,7 @@ struct DisplayView: View {
                 if justSaved {
                     VStack {
                         Spacer()
-                        Text(NSLocalizedString("Saved", comment: ""))
+                        Text("Saved")
                             .font(.footnote.weight(.semibold))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -146,7 +160,7 @@ struct DisplayView: View {
                     .animation(.easeInOut(duration: 0.25), value: justSaved)
                 }
             }
-            .navigationTitle(NSLocalizedString("Display", comment: ""))
+            .navigationTitle("Display")
             .onAppear {
                 if !hasThemeExpansion, let manager = themeExpansion, manager.isCustomThemeIdentifier(appThemeRaw) {
                     appThemeRaw = AppTheme.system.rawValue
@@ -209,13 +223,13 @@ struct DisplayView: View {
     
     private var usernameCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(NSLocalizedString("Username", comment: ""))
+            Text("Username")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
             
             HStack {
-                TextField(NSLocalizedString("Username", comment: ""), text: $username)
+                TextField("Username", text: $username)
                     .font(.body)
                     .foregroundColor(.primary)
                     .padding(.vertical, 8)
@@ -252,7 +266,7 @@ struct DisplayView: View {
     
     private var accentCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(NSLocalizedString("Accent", comment: ""))
+            Text("Accent")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
@@ -270,7 +284,7 @@ struct DisplayView: View {
                 } label: {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                        Text(NSLocalizedString("Save", comment: ""))
+                        Text("Save")
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
@@ -289,7 +303,7 @@ struct DisplayView: View {
                 } label: {
                     HStack {
                         Image(systemName: "arrow.uturn.backward.circle")
-                        Text(NSLocalizedString("Reset", comment: ""))
+                        Text("Reset")
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -313,6 +327,7 @@ struct DisplayView: View {
     }
 
     private var themeExpansionUpsellCard: some View {
+        let isAppStore = themeExpansion?.isAppStoreBuild ?? true
         let productLoaded = themeExpansion?.themeExpansionProduct != nil
         return VStack(alignment: .leading, spacing: 14) {
             Text("StikDebug Theme Expansion")
@@ -320,92 +335,106 @@ struct DisplayView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
 
-            Text("Unlock custom accent colors and dynamic backgrounds with the Theme Expansion.")
-                .font(.body)
-                .foregroundColor(.secondary)
-
-            if let price = themeExpansion?.themeExpansionProduct?.displayPrice {
-                Text("One-time purchase • \(price)")
-                    .font(.subheadline)
+            if !isAppStore {
+                Text("Theme Expansion is coming soon on this store.")
+                    .font(.body)
                     .foregroundColor(.secondary)
-            }
+                Text("For now, you can continue using the default theme.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("Unlock custom accent colors and dynamic backgrounds with the Theme Expansion.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
 
-            if productLoaded, let manager = themeExpansion {
-                Button {
-                    Task { await manager.purchaseThemeExpansion() }
-                } label: {
-                    HStack {
-                        if manager.isProcessing {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                        }
-                        Text(manager.isProcessing ? "Purchasing…" : "Unlock Theme Expansion")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.blue)
-                    )
-                    .foregroundColor(Color.blue.contrastText())
-                }
-                .disabled(manager.isProcessing)
-            } else if let manager = themeExpansion {
-                Button {
-                    Task { await manager.refreshEntitlements() }
-                } label: {
-                    HStack {
-                        if manager.isProcessing {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                        }
-                        Text(manager.isProcessing ? "Contacting App Store…" : "Try Again")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.blue.opacity(0.4), lineWidth: 1)
-                    )
-                }
-                .disabled(manager.isProcessing)
-            }
-
-            if let manager = themeExpansion {
-                Button {
-                    Task { await manager.restorePurchases() }
-                } label: {
-                    Text("Restore Purchase")
+                if let price = themeExpansion?.themeExpansionProduct?.displayPrice {
+                    let priceText = String(format: String(localized: "One-time purchase • %@"), price)
+                    Text(priceText)
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                }
+
+                if productLoaded, let manager = themeExpansion {
+                    let purchaseTitle = manager.isProcessing ? String(localized: "Purchasing…") : String(localized: "Unlock Theme Expansion")
+                    Button {
+                        Task { await manager.purchaseThemeExpansion() }
+                    } label: {
+                        HStack {
+                            if manager.isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                            }
+                            Text(purchaseTitle)
+                                .fontWeight(.semibold)
+                        }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.blue)
+                        )
+                        .foregroundColor(Color.blue.contrastText())
+                    }
+                    .disabled(manager.isProcessing)
+                } else if let manager = themeExpansion {
+                    let retryTitle = manager.isProcessing ? String(localized: "Contacting App Store…") : String(localized: "Try Again")
+                    Button {
+                        Task { await manager.refreshEntitlements() }
+                    } label: {
+                        HStack {
+                            if manager.isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                            }
+                            Text(retryTitle)
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .stroke(Color.blue.opacity(0.4), lineWidth: 1)
                         )
+                    }
+                    .disabled(manager.isProcessing)
                 }
-                .disabled(manager.isProcessing)
-            }
 
-            if let manager = themeExpansion, !productLoaded, manager.lastError == nil {
-                Text(manager.isProcessing ? "Contacting the App Store…" : "Waiting for App Store information.")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            }
+                if let manager = themeExpansion {
+                    Button {
+                        Task { await manager.restorePurchases() }
+                    } label: {
+                        Text("Restore Purchase")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.blue.opacity(0.4), lineWidth: 1)
+                            )
+                    }
+                    .disabled(manager.isProcessing)
+                }
 
-            if let error = themeExpansion?.lastError {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundColor(.red)
+                if let manager = themeExpansion, !productLoaded, manager.lastError == nil {
+                    Text(manager.isProcessing ? String(localized: "Contacting the App Store…") : String(localized: "Waiting for App Store information."))
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+
+                if let error = themeExpansion?.lastError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundColor(.red)
+                }
             }
         }
         .padding(20)
+        .frame(maxWidth: .infinity) // ensure background fills available width
         .background(
+            // Slightly thicker material so the upsell stands out over the previews
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.regularMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
@@ -414,6 +443,7 @@ struct DisplayView: View {
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
         .task {
             if let manager = themeExpansion,
+               manager.isAppStoreBuild,
                !manager.isProcessing,
                manager.themeExpansionProduct == nil,
                manager.lastError == nil {
@@ -424,16 +454,16 @@ struct DisplayView: View {
     
     private var jitOptionsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(NSLocalizedString("App List", comment: ""))
+            Text("App List")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
             
             VStack(alignment: .leading, spacing: 6) {
-                Toggle(NSLocalizedString("Load App Icons", comment: ""), isOn: $loadAppIconsOnJIT)
+                Toggle("Load App Icons", isOn: $loadAppIconsOnJIT)
                     .tint(accentColor)
                 
-                Text(NSLocalizedString("Disabling this will hide app icons in the app list and may improve performance, while also giving it a more minimalistic look.", comment: ""))
+                Text("Disabling this will hide app icons in the app list and may improve performance, while also giving it a more minimalistic look.")
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
@@ -452,7 +482,7 @@ struct DisplayView: View {
     
     private var themeCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(NSLocalizedString("Theme", comment: ""))
+            Text("Theme")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
@@ -461,13 +491,15 @@ struct DisplayView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(AppTheme.allCases, id: \.self) { theme in
                     ThemePreviewCard(style: theme.backgroundStyle,
-                                      title: theme.displayName,
-                                      selected: selectedBuiltInTheme == theme && selectedCustomTheme == nil) {
-                        guard hasThemeExpansion else { return }
-                        appThemeRaw = theme.rawValue
-                        applyThemePreferences()
-                        showSavedToast()
-                    }
+                                     title: Text(theme.displayName),
+                                     selected: selectedBuiltInTheme == theme && selectedCustomTheme == nil,
+                                     action: {
+                                         guard hasThemeExpansion else { return }
+                                         appThemeRaw = theme.rawValue
+                                         applyThemePreferences()
+                                         showSavedToast()
+                                     },
+                                     staticPreview: false)
                 }
             }
         }
@@ -480,7 +512,37 @@ struct DisplayView: View {
                         .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
                 )
         )
-            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+    }
+
+    // Static version used in locked preview to avoid background animation cost
+    private var themeCardStatic: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Theme")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(AppTheme.allCases, id: \.self) { theme in
+                    ThemePreviewCard(style: theme.backgroundStyle,
+                                     title: Text(theme.displayName),
+                                     selected: selectedBuiltInTheme == theme && selectedCustomTheme == nil,
+                                     action: {},
+                                     staticPreview: true)
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
     }
 
     @ViewBuilder
@@ -524,12 +586,14 @@ struct DisplayView: View {
                         ForEach(manager.customThemes, id: \.id) { theme in
                             let identifier = manager.customThemeIdentifier(for: theme)
                             ThemePreviewCard(style: manager.backgroundStyle(for: identifier),
-                                             title: theme.name,
-                                             selected: selectedCustomTheme?.id == theme.id) {
-                                appThemeRaw = identifier
-                                applyThemePreferences()
-                                showSavedToast()
-                            }
+                                             title: Text(verbatim: theme.name),
+                                             selected: selectedCustomTheme?.id == theme.id,
+                                             action: {
+                                                 appThemeRaw = identifier
+                                                 applyThemePreferences()
+                                                 showSavedToast()
+                                             },
+                                             staticPreview: false)
                             .contextMenu {
                                 Button("Edit") { editingCustomTheme = theme }
                                 Button("Delete", role: .destructive) {
@@ -584,20 +648,128 @@ struct DisplayView: View {
             withAnimation { justSaved = false }
         }
     }
+
+    // MARK: - Paywall previews (optimized look, non-interactive)
+
+    private func lockedPreview<Content: View>(_ content: Content) -> some View {
+        content
+            // Hardware-optimized blur via system material over the content
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.4) // more transparent blur for a stronger preview
+            )
+            // Slight dim to improve contrast and preserve the “locked” feel
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.black.opacity(0.03)) // lighter dim for more visibility
+            )
+            .overlay(alignment: .topLeading) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.fill")
+                    Text("Preview")
+                        .fontWeight(.semibold)
+                }
+                .font(.caption2)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                .padding(12)
+            }
+            .compositingGroup() // flatten for better GPU compositing
+            .allowsHitTesting(false)
+    }
+
+    // Use static theme grid inside the locked preview to avoid animation cost
+    private var accentPreview: some View { lockedPreview(accentCard) }
+    private var themePreview: some View { lockedPreview(themeCardStatic) }
+    
+    private var customThemesPreview: some View {
+        lockedPreview(customThemesPreviewCard)
+    }
+    
+    private var customThemesPreviewCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Custom Themes")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                Spacer()
+                Label("New", systemImage: "plus.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .opacity(0.6)
+            }
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ThemePreviewCard(
+                    style: .customGradient(colors: [Color(hex: "#3E4C7C") ?? .indigo,
+                                                    Color(hex: "#1C1F3A") ?? .blue]),
+                    title: Text("Midnight Fade"),
+                    selected: false,
+                    action: {},
+                    staticPreview: true
+                )
+                ThemePreviewCard(
+                    style: .customGradient(colors: [Color(hex: "#00F5A0") ?? .green,
+                                                    Color(hex: "#00D9F5") ?? .cyan,
+                                                    Color(hex: "#C96BFF") ?? .purple]),
+                    title: Text("Neon Drift"),
+                    selected: false,
+                    action: {},
+                    staticPreview: true
+                )
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+    }
 }
 
 // MARK: - Theme Preview Card
 
 private struct ThemePreviewCard: View {
     let style: BackgroundStyle
-    let title: String
+    let title: Text
     let selected: Bool
     let action: () -> Void
+    var staticPreview: Bool = false
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private func staticized(_ style: BackgroundStyle) -> BackgroundStyle {
+        switch style {
+        case .staticGradient(let colors):
+            return .staticGradient(colors: colors)
+        case .animatedGradient(let colors, _):
+            return .staticGradient(colors: colors)
+        case .blobs(_, let background):
+            // Use the background gradient for a static look
+            return .staticGradient(colors: background)
+        case .particles(_, let background):
+            // Use the background gradient for a static look
+            return .staticGradient(colors: background)
+        case .customGradient(let colors):
+            return .customGradient(colors: colors)
+        case .adaptiveGradient(let light, let dark):
+            let colors = colorScheme == .dark ? dark : light
+            return .staticGradient(colors: colors)
+        }
+    }
     
     var body: some View {
         Button(action: action) {
             ZStack {
-                ThemedBackground(style: style)
+                ThemedBackground(style: staticPreview ? staticized(style) : style)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(.ultraThinMaterial)
@@ -607,7 +779,7 @@ private struct ThemePreviewCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(spacing: 6) {
-                    Text(title)
+                    title
                         .font(.footnote.weight(.semibold))
                         .foregroundColor(.primary)
                         .padding(.horizontal, 8)
@@ -668,7 +840,9 @@ private struct CustomThemeEditorView: View {
     private let initialTheme: CustomTheme?
 
     var body: some View {
-        NavigationStack {
+        let titleKey: LocalizedStringKey = initialTheme == nil ? "New Theme" : "Edit Theme"
+
+        return NavigationStack {
             Form {
                 Section(header: Text("Details")) {
                     TextField("Theme Name", text: $name)
@@ -729,7 +903,7 @@ private struct CustomThemeEditorView: View {
                     }
                 }
             }
-            .navigationTitle(initialTheme == nil ? "New Theme" : "Edit Theme")
+            .navigationTitle(titleKey)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -739,7 +913,7 @@ private struct CustomThemeEditorView: View {
                     Button("Save") {
                         let hexes = colors.compactMap { $0.toHex() ?? "#3E4C7C" }
                         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let finalName = trimmed.isEmpty ? "Untitled Theme" : trimmed
+                        let finalName = trimmed.isEmpty ? String(localized: "Untitled Theme") : trimmed
                         let theme = CustomTheme(id: initialTheme?.id ?? UUID(),
                                                 name: finalName,
                                                 style: style,
@@ -761,7 +935,7 @@ private struct CustomThemeEditorView: View {
 
         var id: String { rawValue }
 
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
             case .system: return "System"
             case .light:  return "Light"
@@ -786,3 +960,4 @@ private struct CustomThemeEditorView: View {
         }
     }
 }
+
