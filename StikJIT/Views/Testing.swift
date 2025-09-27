@@ -540,6 +540,20 @@ struct GlassIconButtonStyle: ButtonStyle {
     }
 }
 
+// Small capsule "BETA" tag for nav bar
+private struct BetaTag: View {
+    var body: some View {
+        Text("BETA")
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.orange.opacity(0.9), in: Capsule())
+            .foregroundStyle(.white)
+            .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
+            .accessibilityLabel("Beta")
+    }
+}
+
 // MARK: - Custom glassy tab switcher (Repos disabled; only Testing)
 
 enum ManagerSection: String, CaseIterable, Identifiable {
@@ -612,6 +626,7 @@ private struct CertPickerSheet: View {
     let certs: [Certificate]
     @Binding var selectedID: UUID?
     var onAdd: () -> Void
+    var onDelete: (Certificate) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -629,6 +644,12 @@ private struct CertPickerSheet: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture { selectedID = cert.id; dismiss() }
+                    }
+                    .onDelete { idx in
+                        for i in idx {
+                            let c = certs[i]
+                            onDelete(c)
+                        }
                     }
                     Button {
                         dismiss()
@@ -785,6 +806,11 @@ struct IPAAppManagerView: View {
             // Show nav bar title again
             .navigationTitle("Testing")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    BetaTag()
+                }
+            }
             .stikImporter(isPresented: $pickerShown,
                           selectedURLs: .constant([]),
                           allowedContentTypes: [.item],
@@ -880,7 +906,8 @@ struct IPAAppManagerView: View {
                     CertPickerSheet(
                         certs: mgr.certs,
                         selectedID: $mgr.selectedCertID,
-                        onAdd: { showAddCert = true }
+                        onAdd: { showAddCert = true },
+                        onDelete: { cert in mgr.deleteCert(cert) }
                     )
                 }
                 
