@@ -1,6 +1,6 @@
 //
 //  Testing.swift
-//  StikDebug 2
+//  StikDebug
 //
 //  Created by Stephen Bove on 8/8/25.
 //
@@ -9,7 +9,7 @@ import SwiftUI
 import Foundation
 import UniformTypeIdentifiers
 import ZIPFoundation
-import Zsign
+import ZSign
 import StikImporter
 import UIKit
 import PhotosUI
@@ -364,6 +364,18 @@ final class AppSignerManager: ObservableObject {
                     try? FileManager.default.copyItem(at: icon1024URL, to: previewDest)
                 }
                 
+                let pw = KeychainHelper.shared.readPassword(forKey: cert.id.uuidString) ?? ""
+                let rc = zsign(
+                    appFolder.path,
+                    cert.p12URL.path,
+                    cert.p12URL.path,
+                    cert.mobURL?.path ?? "",
+                    pw
+                )
+                guard rc == 0 else {
+                    throw NSError(domain: "zsign", code: Int(rc),
+                                  userInfo: [NSLocalizedDescriptionKey: "zsign returned \(rc)"])
+                }
                 
                 let outDir = docs.appendingPathComponent("SignedApps/\(newName)", isDirectory: true)
                 if FileManager.default.fileExists(atPath: outDir.path) { try FileManager.default.removeItem(at: outDir) }
@@ -540,7 +552,7 @@ enum ManagerSection: String, CaseIterable, Identifiable {
 
 struct GlassLiquidTabSwitcher: View {
     @Binding var selection: ManagerSection
-    var accent: Color = .blue
+    var accent: Color = .white
     var height: CGFloat = 56
     
     private let pad: CGFloat = 6
@@ -685,9 +697,8 @@ private struct ManageCertsView: View {
 
 struct IPAAppManagerView: View {
     @AppStorage("customAccentColor") private var customAccentColorHex: String = ""
-    @Environment(\.themeExpansionManager) private var themeExpansion
     private var accent: Color {
-        themeExpansion?.resolvedAccentColor(from: customAccentColorHex) ?? .blue
+        customAccentColorHex.isEmpty ? .white : Color(hex: customAccentColorHex) ?? .white
     }
     
     @StateObject private var mgr = AppSignerManager()
