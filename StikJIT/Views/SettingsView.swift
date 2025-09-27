@@ -87,7 +87,7 @@ struct SettingsView: View {
                 if isImportingFile {
                     Color.black.opacity(0.35).ignoresSafeArea()
                     VStack(spacing: 12) {
-                        ProgressView(NSLocalizedString("Processing pairing file…", comment: ""))
+                        ProgressView("Processing pairing file…")
                         VStack(spacing: 8) {
                             GeometryReader { geometry in
                                 ZStack(alignment: .leading) {
@@ -161,9 +161,9 @@ struct SettingsView: View {
                         if fileManager.fileExists(atPath: URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path) {
                             try fileManager.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
                         }
-
+                        
                         try fileManager.copyItem(at: url, to: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
-                        print(NSLocalizedString("File copied successfully!", comment: "Settings pairing file copy success"))
+                        print("File copied successfully!")
                         
                         DispatchQueue.main.async {
                             isImportingFile = true
@@ -187,17 +187,17 @@ struct SettingsView: View {
                         startHeartbeatInBackground()
                         
                     } catch {
-                        print(String(format: NSLocalizedString("Error copying file: %@", comment: "Settings pairing file copy failure"), String(describing: error)))
+                        print("Error copying file: \(error)")
                     }
                 } else {
-                    print(NSLocalizedString("Source file does not exist.", comment: "Settings pairing file missing"))
+                    print("Source file does not exist.")
                 }
                 
                 if accessing {
                     url.stopAccessingSecurityScopedResource()
                 }
             case .failure(let error):
-                print(String(format: NSLocalizedString("Failed to import file: %@", comment: "Settings pairing file import failure"), String(describing: error)))
+                print("Failed to import file: \(error)")
             }
         }
     }
@@ -218,7 +218,7 @@ struct SettingsView: View {
                                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
                         )
                 }
-                Text("StikDebug".localized)
+                Text("StikDebug")
                     .font(.title2.weight(.semibold))
                     .foregroundColor(.primary)
             }
@@ -230,7 +230,7 @@ struct SettingsView: View {
     private var appearanceCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Appearance".localized)
+                Text("Appearance")
                     .font(.headline)
                     .foregroundColor(.primary)
 
@@ -260,7 +260,7 @@ struct SettingsView: View {
                         Image(systemName: "paintbrush")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.85))
-                        Text("Customize Display".localized)
+                        Text("Customize Display")
                             .foregroundColor(.primary.opacity(0.85))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -284,7 +284,7 @@ struct SettingsView: View {
     private var pairingCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Pairing File".localized)
+                Text("Pairing File")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -294,7 +294,7 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: "doc.badge.plus")
                             .font(.system(size: 18))
-                        Text("Import New Pairing File".localized)
+                        Text("Import New Pairing File")
                             .fontWeight(.medium)
                     }
                     .frame(maxWidth: .infinity)
@@ -310,7 +310,7 @@ struct SettingsView: View {
                 if showPairingFileMessage && !isImportingFile {
                     HStack {
                         Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
-                        Text("Pairing file successfully imported".localized)
+                        Text("Pairing file successfully imported")
                             .font(.callout)
                             .foregroundColor(.green)
                         Spacer()
@@ -325,7 +325,7 @@ struct SettingsView: View {
     private var behaviorCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Behavior".localized)
+                Text("Behavior")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -353,7 +353,7 @@ struct SettingsView: View {
     private var advancedCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Advanced".localized)
+                Text("Advanced")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -362,7 +362,7 @@ struct SettingsView: View {
                         Image(systemName: "folder")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text("App Folder".localized)
+                        Text("App Folder")
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                         Image(systemName: "chevron.right")
@@ -378,7 +378,7 @@ struct SettingsView: View {
     private var helpCard: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Help".localized)
+                Text("Help")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -391,7 +391,7 @@ struct SettingsView: View {
                         Image(systemName: "questionmark.circle")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text("Pairing File Guide".localized)
+                        Text("Pairing File Guide")
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                     }
@@ -407,7 +407,7 @@ struct SettingsView: View {
                         Image(systemName: "questionmark.circle")
                             .font(.system(size: 18))
                             .foregroundColor(.primary.opacity(0.8))
-                        Text("Need support? Join the Discord!".localized)
+                        Text("Need support? Join the Discord!")
                             .foregroundColor(.primary.opacity(0.8))
                         Spacer()
                     }
@@ -418,7 +418,7 @@ struct SettingsView: View {
                     Image(systemName: "shield.slash")
                         .font(.system(size: 18))
                         .foregroundColor(.primary.opacity(0.8))
-                    Text("You can turn off the VPN in the Settings app.".localized)
+                    Text("You can turn off the VPN in the Settings app.")
                         .foregroundColor(.secondary)
                 }
                 .padding(.top, 4)

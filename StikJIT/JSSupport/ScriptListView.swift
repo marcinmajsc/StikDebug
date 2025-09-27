@@ -38,6 +38,7 @@ struct ScriptListView: View {
     
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.system.rawValue
     @Environment(\.themeExpansionManager) private var themeExpansion
+    @Environment(\.colorScheme) private var colorScheme
     private var backgroundStyle: BackgroundStyle { themeExpansion?.backgroundStyle(for: appThemeRaw) ?? AppTheme.system.backgroundStyle }
     private var preferredScheme: ColorScheme? { themeExpansion?.preferredColorScheme(for: appThemeRaw) }
 
@@ -124,7 +125,7 @@ struct ScriptListView: View {
                 Button(NSLocalizedString("Delete", comment: ""), role: .destructive) { deleteScript(script) }
                 Button(NSLocalizedString("Cancel", comment: ""), role: .cancel) { pendingDelete = nil }
             } message: { script in
-                Text(String(format: NSLocalizedString("Are you sure you want to delete %@? This cannot be undone.", comment: "Confirm file delete"), script.lastPathComponent))
+                Text(String(format: NSLocalizedString("Are you sure you want to delete %@? This cannot be undone.", comment: "Confirm script deletion"), script.lastPathComponent))
             }
             .fileImporter(
                 isPresented: $showImporter,
@@ -133,7 +134,7 @@ struct ScriptListView: View {
                 switch result {
                 case .success(let fileURL): importScript(from: fileURL)
                 case .failure(let error): presentError(title: NSLocalizedString("Import Failed", comment: ""), message: error.localizedDescription)
-                }
+            }
             }
         }
         .preferredColorScheme(preferredScheme)
@@ -285,6 +286,8 @@ struct ScriptListView: View {
             colors = background.isEmpty ? [particle, particle.opacity(0.4)] : background
         case .customGradient(let palette):
             colors = palette
+        case .adaptiveGradient(let light, let dark):
+            colors = colorScheme == .dark ? dark : light
         }
         if colors.count >= 2 { return colors }
         if let first = colors.first { return [first, first.opacity(0.6)] }

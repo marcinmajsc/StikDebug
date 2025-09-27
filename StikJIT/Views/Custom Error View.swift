@@ -39,9 +39,7 @@ struct CustomErrorView: View {
     }
 
     private var primaryButtonForegroundColor: Color {
-        if colorScheme == .dark {
-            return .black
-        }
+        if colorScheme == .dark { return .black }
         return accentColor.contrastText()
     }
     
@@ -78,7 +76,7 @@ struct CustomErrorView: View {
                 
                 Text(title)
                     .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(.primary)
+                    .foregroundColor(colorScheme == .dark ? .white : .black)
                     .multilineTextAlignment(.center)
                 
                 Rectangle()
@@ -86,9 +84,9 @@ struct CustomErrorView: View {
                     .foregroundColor(colorScheme == .dark ? .white.opacity(0.2) : .black.opacity(0.2))
                     .padding(.horizontal, 12)
                 
-                Text(message)
+                Text(LocalizedStringKey(message))
                     .font(.system(size: 15, design: .rounded))
-                    .foregroundColor(.primary.opacity(0.9))
+                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.9))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 12)
@@ -106,8 +104,8 @@ struct CustomErrorView: View {
                                 .frame(height: 38)
                                 .frame(maxWidth: .infinity)
                                 .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(colorScheme == .dark ? Color.white : accentColor)
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(colorScheme == .dark ? Color.white : accentColor)
                                 )
                         }
                         

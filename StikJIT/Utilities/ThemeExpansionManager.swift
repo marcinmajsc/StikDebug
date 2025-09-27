@@ -12,10 +12,10 @@ enum CustomThemeStyle: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .staticGradient:   return "Static Gradient"
-        case .animatedGradient: return "Animated Gradient"
-        case .blobs:            return "Floating Blobs"
-        case .particles:        return "Particle Field"
+        case .staticGradient:   return String(localized: "Static Gradient")
+        case .animatedGradient: return String(localized: "Animated Gradient")
+        case .blobs:            return String(localized: "Floating Blobs")
+        case .particles:        return String(localized: "Particle Field")
         }
     }
 }
@@ -63,6 +63,14 @@ struct CustomTheme: Identifiable, Codable, Equatable {
     }
 }
 
+// MARK: - Distribution detection (receipt-based)
+
+enum DistributorType: String {
+    case appStore
+    case testFlight
+    case other
+}
+
 @MainActor
 final class ThemeExpansionManager: ObservableObject {
     static let productIdentifier = "SD_Theme_Expansion"
@@ -73,12 +81,17 @@ final class ThemeExpansionManager: ObservableObject {
     @Published var lastError: String?
     @Published private(set) var customThemes: [CustomTheme] = []
 
+    // New: distribution awareness
+    @Published private(set) var distributor: DistributorType
+    var isAppStoreBuild: Bool { distributor == .appStore }
+
     private var updatesTask: Task<Void, Never>?
     private let isPreviewInstance: Bool
     private let customThemesKey = "ThemeExpansion.CustomThemes"
 
     init(previewUnlocked: Bool = false) {
         self.isPreviewInstance = previewUnlocked
+        self.distributor = ThemeExpansionManager.detectDistributor()
         self.hasThemeExpansion = previewUnlocked
         loadCustomThemes()
 
@@ -93,23 +106,34 @@ final class ThemeExpansionManager: ObservableObject {
 
         guard !previewUnlocked else { return }
 
-        // Listen for transaction updates and apply verified ones
-        updatesTask = Task { [weak self] in
-            guard let self else { return }
-            for await result in StoreKit.Transaction.updates {
-                await self.handle(transactionResult: result)
+        // Only wire StoreKit listeners if this is an App Store build
+        if isAppStoreBuild {
+            updatesTask = Task { [weak self] in
+                guard let self else { return }
+                for await result in StoreKit.Transaction.updates {
+                    await self.handle(transactionResult: result)
+                }
             }
-        }
 
-        Task { await refreshEntitlements() }
+            Task { await refreshEntitlements() }
+        } else {
+            // Non–App Store builds cannot purchase yet; keep everything locked and quiet
+            self.hasThemeExpansion = false
+            self.themeExpansionProduct = nil
+            self.lastError = nil
+        }
     }
 
     deinit {
         updatesTask?.cancel()
     }
 
+    // MARK: - Public API
+
     func refreshEntitlements() async {
         guard !isPreviewInstance else { return }
+        guard isAppStoreBuild else { return } // No-op outside App Store
+
         isProcessing = true
         defer { isProcessing = false }
         do {
@@ -138,6 +162,10 @@ final class ThemeExpansionManager: ObservableObject {
 
     func restorePurchases() async {
         guard !isPreviewInstance else { return }
+        guard isAppStoreBuild else {
+            lastError = String(localized: "Theme Expansion is coming soon on this store.")
+            return
+        }
         isProcessing = true
         defer { isProcessing = false }
         do {
@@ -151,6 +179,10 @@ final class ThemeExpansionManager: ObservableObject {
 
     func purchaseThemeExpansion() async {
         guard !isPreviewInstance else { return }
+        guard isAppStoreBuild else {
+            lastError = String(localized: "Theme Expansion is coming soon on this store.")
+            return
+        }
 
         let product: Product
         if let cached = themeExpansionProduct {
@@ -277,6 +309,8 @@ final class ThemeExpansionManager: ObservableObject {
         saveCustomThemes()
     }
 
+    // MARK: - Persistence
+
     private func loadCustomThemes() {
         guard let data = UserDefaults.standard.data(forKey: customThemesKey),
               let decoded = try? JSONDecoder().decode([CustomTheme].self, from: data) else {
@@ -306,6 +340,8 @@ final class ThemeExpansionManager: ObservableObject {
         return [Color.blue, Color.purple]
     }
 
+    // MARK: - StoreKit plumbing
+
     private func handle(transactionResult: VerificationResult<StoreKit.Transaction>, finishTransaction: Bool = true) async {
         switch transactionResult {
         case .verified(let transaction):
@@ -328,6 +364,21 @@ final class ThemeExpansionManager: ObservableObject {
             }
         }
         return false
+    }
+
+    // MARK: - Distributor detection helper
+
+    private static func detectDistributor() -> DistributorType {
+        guard let receiptURL = Bundle.main.appStoreReceiptURL else {
+            return .other
+        }
+        let path = receiptURL.path
+        if FileManager.default.fileExists(atPath: path) {
+            // TestFlight builds use "sandboxReceipt"
+            return receiptURL.lastPathComponent == "sandboxReceipt" ? .testFlight : .appStore
+        } else {
+            return .other
+        }
     }
 }
 
