@@ -752,7 +752,6 @@ struct IPAAppManagerView: View {
                             // Only Testing section
                             signCard.id(signCardAnchor)
                             appsCard
-                            versionInfo
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 20)
@@ -1070,18 +1069,7 @@ struct IPAAppManagerView: View {
             .padding(8)
         }
     }
-    
-    private var versionInfo: some View {
-        HStack {
-            Spacer()
-            Text("iOS \(UIDevice.current.systemVersion)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.top, 6)
-    }
-    
+        
     // MARK: - Helpers (CustomErrorView)
 
     private func fail(_ title: String, _ msg: String) {
